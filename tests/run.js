@@ -564,6 +564,116 @@ function checkU13(q, choices) {
     return pmin === q.correctAnswer;
 }
 
+// 仕事算(u14): 問題文の数値だけから、別の解き方（総当たり・分数）で解き直して照合する
+function checkU14(q, choices) {
+    const t = (q.text + '\n' + q.prompt).replace(/\{\{(\d+)\/(\d+)\}\}/g, '$1/$2'), num = x => Number(String(x).replace(/,/g, ''));
+    const dur = s => { const m = s.match(/^(?:(\d+)時間)?(?:(\d+)分)?$/); return m ? (m[1] ? num(m[1]) * 60 : 0) + (m[2] ? num(m[2]) : 0) : NaN; };
+    const clock = s => { const m = s.match(/^(午[前後])(\d+)時(?:(\d+)分)?$/); return m ? (m[1] === '午後' ? 720 : 0) + num(m[2]) * 60 + (m[3] ? num(m[3]) : 0) : NaN; };
+    let m;
+    if (q.title === '仕事算の基本') {
+        m = t.match(/Aだけで行うと\s*(\d+)\s*\S+、Bだけで行うと\s*(\d+)\s*\S+を要する/); if (!m) return false;
+        const [x, y] = m.slice(1).map(num), sols = [];
+        for (let d = 1; d <= 2000; d++) if (d * (x + y) === x * y) sols.push(d);                 // d/x ＋ d/y ＝ 1
+        return sols.length === 1 && sols[0] === q.correctAnswer;
+    }
+    if (q.title === '3人以上の仕事算') {
+        m = t.match(/3 人で.+?と\s*(\d+) 時間、AとCの 2 人で.+?と\s*(\d+) 時間、Cが 1 人で.+?と\s*(\d+) 時間/); if (!m) return false;
+        const [t1, t2, t3] = m.slice(1).map(num), bc = 1 / t1 - 1 / t2 + 1 / t3;                 // B ＝ 1/t1 － 1/t2、C ＝ 1/t3
+        return bc > 0 && Math.abs(1 / bc - q.correctAnswer) < 1e-9 && Number.isInteger(q.correctAnswer);
+    }
+    if (q.title === '仕事の交替') {
+        m = t.match(/Aが 1 人で行うと\s*(\d+)\s*日かかり、Bが 1 人で行うと\s*(\d+)\s*日.*?(\d+)\s*日で終わった.*?([AB])が/s); if (!m) return false;
+        const [x, y, T] = [num(m[1]), num(m[2]), num(m[3])], sols = [];
+        for (let k = 1; k < T; k++) if (k * y + (T - k) * x === x * y) sols.push(k);                // k/x ＋ (T－k)/y ＝ 1
+        return sols.length === 1 && (m[4] === 'A' ? sols[0] : T - sols[0]) === q.correctAnswer;
+    }
+    if (q.title === 'のべ算') {
+        m = t.match(/ポンプ\s*(\d+)\s*台でくみ出すと\s*(.+?)かかる.*?プールの水を(午[前後]\d+時(?:\d+分)?)にポンプ\s*(\d+)\s*台で.*?途中から\s*(\d+)\s*台のポンプを追加.*?(午[前後]\d+時(?:\d+分)?)にくみ出し終わった/s); if (!m) return false;
+        const N = num(m[1]), D = dur(m[2]), s0 = clock(m[3]), p0 = num(m[4]), mm = num(m[5]), e0 = clock(m[6]), E = e0 - s0, sols = [];
+        for (let x = 1; x < E; x++) if (p0 * x + (p0 + mm) * (E - x) === N * D) sols.push(s0 + x);   // 追加するまでの x 分間は p0 台、残りは p0＋m 台
+        if (sols.length !== 1) return false;
+        let ok = 0; for (const c of choices) { const v = clock(c.htmlText.replace(/^.\s*/, '')); if (Number.isNaN(v) || (v === sols[0]) !== c.isCorrect) return false; if (c.isCorrect) ok++; }
+        return ok === 1 && choices.length === 5 && sols[0] === q.correctAnswer;
+    }
+    m = t.match(/Aのポンプだけで\s*(\d+)\s*分間排水し、その後Bのポンプだけで\s*(\d+)\s*分間.*?同時に\s*(\d+)\s*分間排水し、その後Bのポンプだけで\s*(\d+)\s*分間.*?([AB])のポンプだけで排水して/s); if (!m) return false;
+    const [a1, b1, a2, b2] = m.slice(1, 5).map(num), pn = (a2 + b2 - b1), qn = (a1 - a2);       // a : b ＝ (a2＋b2－b1) : (a1－a2)
+    if (pn <= 0 || qn <= 0) return false;
+    const g = Fr.gcd(pn, qn), x = pn / g, y = qn / g, W = a1 * x + b1 * y;
+    if (W !== a2 * (x + y) + b2 * y) return false;
+    const ans = m[5] === 'A' ? W / x : W / y;
+    return Number.isInteger(ans) && ans === q.correctAnswer;
+}
+
+// ニュートン算(u15): 問題文の数値だけから、別の解き方（総当たり・秒ごとのシミュレーション）で解き直して照合する
+function checkU15(q, choices) {
+    const t = (q.text + '\n' + q.prompt), num = x => Number(String(x).replace(/,/g, ''));
+    const secOf = s => { const m = s.match(/^(\d+)分(?:(\d+)秒)?$/); return m ? num(m[1]) * 60 + (m[2] ? num(m[2]) : 0) : NaN; };
+    const timeChoicesOk = (ans) => { let ok = 0; for (const c of choices) { const v = secOf(c.htmlText.replace(/^.\s*/, '')); if (Number.isNaN(v) || (v === ans) !== c.isCorrect) return false; if (c.isCorrect) ok++; } return ok === 1 && choices.length === 5; };
+    let m;
+    if (q.title === 'ニュートン算の基本') {
+        m = t.match(/(\d+) ℓ の水が入っている容器.*?ポンプAを 1 台用いれば\s*(\d+)\s*分.*?毎分\s*(\d+)\s*ℓ の割合.*?ポンプAを\s*(\d+)\s*台用いれば/s); if (!m) return false;
+        const [W, t1, r, k] = m.slice(1).map(num); let p = null;
+        for (let pp = 1; pp <= 5000; pp++) if (W + r * t1 === pp * t1) { p = pp; break; }          // 1台のポンプの毎分排水量
+        if (p === null) return false;
+        let sec = null; for (let s = 1; s <= 20000; s++) if ((k * p - r) * s >= 60 * W) { sec = s; break; }     // 水がなくなる最初の秒
+        return sec === q.correctAnswer && timeChoicesOk(sec);
+    }
+    if (q.title === '不明な情報が2つの場合') {
+        m = t.match(/毎分\s*(\d+)\s*人ずつ売っていくと\s*(\d+)\s*分で行列がなくなり、毎分\s*(\d+)\s*人ずつ売っていくと\s*(\d+)\s*分で/s); if (!m) return false;
+        const [s1, t1, s2, t2] = m.slice(1).map(num), sols = [];
+        for (let N = 0; N <= 5000; N++) for (let r = 0; r <= 300; r++) if (N + r * t1 === s1 * t1 && N + r * t2 === s2 * t2) sols.push(N);
+        return sols.length === 1 && sols[0] === q.correctAnswer;
+    }
+    m = t.match(/ポンプ\s*(\d+)\s*台で排水すると\s*(\d+)\s*分で水が無くなり、ポンプ\s*(\d+)\s*台で排水すると\s*(\d+)\s*分で.*?ポンプ\s*(\d+)\s*台で排水したとき/s); if (!m) return false;
+    const [n1, t1, n2, t2, n3] = m.slice(1).map(num), sols = [];
+    for (let W = 1; W <= 2000; W++) for (let r = 0; r <= 60; r++) if (W + r * t1 === n1 * t1 && W + r * t2 === n2 * t2) sols.push([W, r]);   // p＝1（ポンプ1台の排水量を単位）
+    if (sols.length !== 1) return false;
+    const [W, r] = sols[0]; let sec = null; for (let s = 1; s <= 20000; s++) if ((n3 - r) * s >= 60 * W) { sec = s; break; }
+    return sec === q.correctAnswer && timeChoicesOk(sec);
+}
+
+// 比と割合(u16): 問題文の数値だけから、別の解き方（総当たり・分数）で解き直して照合する
+function checkU16(q, choices) {
+    const t = (q.text + '\n' + q.prompt).replace(/\{\{(\d+)\/(\d+)\}\}/g, '$1/$2'), num = x => Number(String(x).replace(/,/g, ''));
+    const one = () => { let ok = 0; for (const c of choices) if (c.isCorrect) ok++; return ok === 1 && choices.length === 5; };
+    let m;
+    if (q.title === '連比') {
+        m = t.match(/AとBの金額の比は (\d+):(\d+)、BとCの金額の比は (\d+):(\d+) となり、Aは ([\d,]+) 円/); if (!m) return false;
+        const [p, qq, r, s, a] = m.slice(1).map(num), A = p * r, B = qq * r, C = s * qq;                // B を qq×r にそろえる（A:B＝pr:qr、B:C＝qr:sq）
+        const total = a * (A + B + C) / A;
+        return Number.isInteger(total) && total === q.correctAnswer && one() && choices.some(c => c.isCorrect && c.value === total);
+    }
+    if (q.title === '比と割合で表された情報の整理') {
+        m = t.match(/男性と女性の比は、(\d+):(\d+) である.*?事務職と技術職の社員の比は、(\d+):(\d+) であり.*?男性と女性の比は、(\d+):(\d+) である。社員の総数が (\d+) 人.*?事務職の(女性|男性)/s); if (!m) return false;
+        const [mm, f, c, tt, tm, tf, T] = m.slice(1, 8).map(num), who = m[8];
+        let found = null;                                                                           // 全体の男性数 male を総当たり: 各人数がすべて整数になる組み合わせ
+        for (let male = 1; male < T; male++) { if (male * f !== (T - male) * mm) continue; found = male; }
+        if (found === null) return false;
+        const female = T - found, tech = T * tt / (c + tt), office = T - tech, techM = tech * tm / (tm + tf), techF = tech - techM;
+        const ans = who === '女性' ? female - techF : found - techM;
+        return [tech, office, techM, techF].every(Number.isInteger) && ans === q.correctAnswer;
+    }
+    if (q.title === '倍数算') {
+        m = t.match(/1 回目が (\d+):(\d+) となり、2 回目が (\d+):(\d+) となった.*?の.*?は (\d+) 人(増加|減少)し、.*?は (\d+) 人(増加|減少)した/s); if (!m) return false;
+        const [a, b, c, d] = m.slice(1, 5).map(num), d1 = (m[6] === '増加' ? 1 : -1) * num(m[5]), d2 = (m[8] === '増加' ? 1 : -1) * num(m[7]), sols = [];
+        for (let A1 = 1; A1 <= 20000; A1++) { if ((A1 * b) % a !== 0) continue; const B1 = A1 * b / a; if ((A1 + d1) * d === c * (B1 + d2) && A1 + d1 > 0 && B1 + d2 > 0) sols.push(A1); }
+        return sols.length === 1 && sols[0] === q.correctAnswer;
+    }
+    if (q.title === '項目別整理・B') {
+        m = t.match(/(\d+) 名の生徒.*?回答した者は (\d+) 名で、そのうちの(\d+)\/(\d+)が女子であった.*?女子全体の(\d+)\/(\d+)を占めて/s); if (!m) return false;
+        const [N, k, p1, q1, p2, q2] = m.slice(1).map(num), sols = [];
+        for (let G = 1; G < N; G++) { const tg = G * p2 / q2; if (Number.isInteger(tg) && tg * q1 === k * p1) sols.push(G); }    // 旅行の女子 ＝ k×p1/q1 ＝ 女子全体×p2/q2
+        if (sols.length !== 1) return false;
+        const g = Fr.gcd(N - sols[0], N), exp = [(N - sols[0]) / g, N / g]; let ok = 0;
+        for (const c of choices) { const mm = c.htmlText.match(/\{\{(\d+)\/(\d+)\}\}/); if (!mm) return false; const same = Number(mm[1]) === exp[0] && Number(mm[2]) === exp[1]; if (same !== c.isCorrect) return false; if (Fr.gcd(Number(mm[1]), Number(mm[2])) !== 1) return false; if (c.isCorrect) ok++; }
+        return ok === 1 && choices.length === 5 && q.fraction.n === exp[0] && q.fraction.d === exp[1];
+    }
+    m = t.match(/\S+ (\d+) \S+をすくい上げ、1 \S+ずつ印.*?再び\S+ (\d+) \S+をすくい上げ.*?、(\d+) \S+に印がついていた/s); if (!m) return false;
+    const [a, b, c] = m.slice(1).map(num), est = a * b / c, vals = choices.map(x => x.value);
+    const nearest = vals.reduce((best, v) => (Math.abs(v - est) < Math.abs(best - est) ? v : best), vals[0]);       // 推定値にいちばん近い選択肢
+    return nearest === q.correctAnswer && one();
+}
+
 console.log(`単元数: ${R.UnitRegistry.list().length} / 各単元 ${N} 回生成\n`);
 for (const u of R.UnitRegistry.list()) {
     const issues = {};
@@ -576,7 +686,7 @@ for (const u of R.UnitRegistry.list()) {
         if (!Array.isArray(q.steps) || q.steps.length === 0) note('steps欠落', q.title);
         if (!Number.isFinite(q.correctAnswer)) note('答えが数値でない', `${q.title}: ${q.correctAnswer}`);
         else {
-            if (!q.decimals && !q.mixed && !Number.isInteger(q.correctAnswer * (q.allowHalf ? 2 : 1))) note('答えが整数でない（0.5刻みの問題は allowHalf を指定）', `${q.title}: ${q.text} → ${q.correctAnswer}`);
+            if (!q.decimals && !q.mixed && !q.fraction && !Number.isInteger(q.correctAnswer * (q.allowHalf ? 2 : 1))) note('答えが整数でない（0.5刻みの問題は allowHalf を指定）', `${q.title}: ${q.text} → ${q.correctAnswer}`);
             if (q.correctAnswer <= 0) note('答えが0以下', `${q.title}: ${q.text} → ${q.correctAnswer}`);
         }
         if (/NaN|undefined|Infinity/.test(JSON.stringify(q))) note('NaN/undefined混入', `${q.title}: ${q.text}`);
@@ -584,6 +694,9 @@ for (const u of R.UnitRegistry.list()) {
         if (ch.length !== 5 || ch.filter(c => c.isCorrect).length !== 1) note('選択肢が5個/正解1つでない', q.title);
         seen.add(q.text + q.prompt);
         if (u.id === 'u10' && !checkU10(q, ch)) note('u10: 別解法と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
+        if (u.id === 'u16' && !checkU16(q, ch)) note('u16: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
+        if (u.id === 'u15' && !checkU15(q, ch)) note('u15: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
+        if (u.id === 'u14' && !checkU14(q, ch)) note('u14: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u13' && !checkU13(q, ch)) note('u13: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u12' && !checkU12(q, ch)) note('u12: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u11' && !checkU11(q, ch)) note('u11: 独立計算・選択肢・見分け方の不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
