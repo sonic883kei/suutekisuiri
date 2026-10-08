@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高卒公務員試験 数的推理 演習＆CBT模擬試験</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Noto Sans JP', 'Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fadeIn 0.25s ease-out forwards; }
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.35s ease-in-out;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        /* 縦書きの分数 ({{n/d}} を core.js が変換) */
+        .frac { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; margin: 0 0.15em; line-height: 1.15; font-size: 0.95em; }
+        .frac-n { border-bottom: 1.5px solid currentColor; padding: 0 0.3em; }
+        .frac-d { padding: 0 0.3em; }
+        #explanation-content strong {
+            color: #c7d2fe;
+            font-weight: 700;
+            background-color: rgba(99, 102, 241, 0.2);
+            padding: 2px 6px;
+            border-radius: 6px;
+            display: inline-block;
+            margin-top: 4px;
+            border: 1px solid rgba(129, 140, 248, 0.4);
+            font-family: monospace, sans-serif;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col justify-between">
+
+    <header class="bg-[#111827]/90 backdrop-blur-md text-white border-b border-slate-800/80 sticky top-0 z-40">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <button onclick="goToLanding()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 py-1.5 px-3 rounded-xl text-xs transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-house text-indigo-400"></i>
+                    <span class="hidden sm:inline">トップ</span>
+                </button>
+                
+                <button id="nav-change-config-btn" onclick="goToSelectScreen()" class="hidden bg-indigo-950/80 hover:bg-indigo-900/80 text-indigo-200 border border-indigo-700/60 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-sliders text-indigo-400"></i>
+                    <span>条件変更</span>
+                </button>
+
+                <button id="nav-review-btn" onclick="openReviewModal()" class="text-xs bg-indigo-950/80 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-700/60 py-1.5 px-3 rounded-xl transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-list-check text-indigo-400"></i>
+                    <span>回答振り返り</span>
+                </button>
+
+                <button id="nav-stats-btn" onclick="openStatsModal()" class="text-xs bg-amber-950/80 hover:bg-amber-900/80 text-amber-300 border border-amber-700/60 py-1.5 px-3 rounded-xl transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-chart-pie text-amber-400"></i>
+                    <span>分析</span>
+                </button>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <button id="nav-reset-btn" onclick="resetStats()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 py-1.5 px-3 rounded-xl transition flex items-center space-x-1">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span class="hidden sm:inline">クリア</span>
+                </button>
+                <button id="nav-history-btn" onclick="openHistoryModal()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 py-1.5 px-3 rounded-xl transition flex items-center space-x-1">
+                    <i class="fa-solid fa-clock-rotate-left text-teal-400"></i>
+                    <span class="inline">履歴</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto w-full px-4 py-6 flex-grow flex flex-col justify-center">
+
+        <!-- 1. LANDING VIEW -->
+        <section id="view-landing" class="w-full animate-fade-in my-auto">
+            <div class="bg-[#141a2e] rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-800 text-center max-w-lg mx-auto">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-500/10 text-indigo-400 mb-4 border border-indigo-500/20">
+                    <i class="fa-solid fa-calculator text-3xl"></i>
+                </div>
+                <h1 class="text-2xl font-extrabold text-white mb-2">高卒公務員試験 数的推理</h1>
+                <p class="text-xs md:text-sm text-slate-400 mb-8 leading-relaxed">
+                    全23単元対応・数値ランダム演習＆本番形式CBT模擬試験
+                </p>
+
+                <div class="space-y-4">
+                    <button onclick="goToSelectScreen()" class="w-full p-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold transition flex items-center justify-between group shadow-lg shadow-indigo-950/50">
+                        <div class="flex items-center space-x-3 text-left">
+                            <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0">
+                                <i class="fa-solid fa-book-open"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm md:text-base font-bold">通常 問題演習モード</h3>
+                                <p class="text-[11px] text-indigo-200 font-normal">単元を選んでランダム数値問題に挑戦</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-indigo-200 group-hover:translate-x-1 transition-transform"></i>
+                    </button>
+
+                    <button onclick="openCBTModal()" class="w-full p-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold transition flex items-center justify-between group shadow-lg shadow-emerald-950/50">
+                        <div class="flex items-center space-x-3 text-left">
+                            <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0">
+                                <i class="fa-solid fa-laptop-code"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm md:text-base font-bold">CBT 模擬試験モード</h3>
+                                <p class="text-[11px] text-emerald-200 font-normal">最大10単元を選択！10問12分テスト</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-emerald-200 group-hover:translate-x-1 transition-transform"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. UNIT SELECT VIEW -->
+        <section id="view-select" class="hidden w-full animate-fade-in max-w-2xl mx-auto">
+            <div class="bg-[#141a2e] rounded-3xl p-6 shadow-xl border border-slate-800">
+                <div class="flex items-center justify-between mb-5 pb-3 border-b border-slate-800">
+                    <h2 class="text-lg font-extrabold text-white flex items-center">
+                        <i class="fa-solid fa-sliders text-indigo-400 mr-2"></i>演習単元の設定
+                    </h2>
+                    <span class="text-xs text-slate-400">通常演習</span>
+                </div>
+
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-indigo-300 uppercase tracking-wider mb-2.5">演習する単元</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[360px] overflow-y-auto pr-1" id="unit-selection-grid">
+                        <!-- JS動的生成 -->
+                    </div>
+                </div>
+
+                <button onclick="startPracticeWithConfig()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-sm shadow-lg shadow-indigo-950/60 transition flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-play"></i>
+                    <span>この単元で演習を開始する</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- 3. CBT STATUS BAR -->
+        <section id="cbt-status-bar" class="hidden mb-5 bg-[#141a2e] text-white rounded-3xl p-5 shadow-2xl border border-slate-800 max-w-2xl mx-auto w-full animate-fade-in">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                
+                <div class="relative w-24 h-24 flex items-center justify-center shrink-0">
+                    <svg class="w-full h-full" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="50" stroke="#1e293b" stroke-width="8" fill="transparent" />
+                        <circle id="cbt-circle-outer" class="progress-ring-circle" cx="60" cy="60" r="50" 
+                                stroke="#10b981" stroke-width="8" fill="transparent" 
+                                stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="0" />
+                        
+                        <circle cx="60" cy="60" r="36" stroke="#1e293b" stroke-width="8" fill="transparent" />
+                        <circle id="cbt-circle-inner" class="progress-ring-circle" cx="60" cy="60" r="36" 
+                                stroke="#6366f1" stroke-width="8" fill="transparent" 
+                                stroke-linecap="round" stroke-dasharray="226.19" stroke-dashoffset="226.19" />
+                    </svg>
+                </div>
+
+                <div class="flex-grow text-center sm:text-left">
+                    <div class="flex items-center justify-center sm:justify-start space-x-2 mb-1">
+                        <span id="cbt-mode-badge" class="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-bold inline-flex items-center">
+                            <i class="fa-solid fa-laptop-code mr-1.5"></i> CBT 模擬試験
+                        </span>
+                        <span class="text-xs text-slate-300 font-bold" id="cbt-q-counter">1 / 10問</span>
+                    </div>
+                    <p class="text-xs text-slate-400">全体残り時間: <span id="cbt-timer-text" class="text-amber-400 font-bold">12:00</span></p>
+                </div>
+
+                <div class="shrink-0 w-full sm:w-auto">
+                    <button onclick="exitCBTMode()" class="w-full sm:w-auto bg-slate-800/90 hover:bg-rose-950/50 hover:text-rose-300 text-slate-400 border border-slate-700/80 hover:border-rose-800/60 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5">
+                        <i class="fa-solid fa-rectangle-xmark"></i>
+                        <span>テスト中断</span>
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- 4. PRACTICE VIEW -->
+        <section id="view-practice" class="hidden w-full animate-fade-in max-w-2xl mx-auto my-auto">
+            
+            <div id="practice-config-banner" class="mb-4 bg-[#141a2e] rounded-xl px-4 py-2.5 border border-slate-800 flex justify-between items-center text-xs">
+                <div class="flex items-center space-x-2">
+                    <span class="text-slate-400">現在の設定:</span>
+                    <span id="active-config-badge" class="px-2.5 py-0.5 rounded-md bg-indigo-950 text-indigo-300 font-bold border border-indigo-800/50">
+                        全単元 混合
+                    </span>
+                </div>
+                <button onclick="goToSelectScreen()" class="text-indigo-400 hover:text-indigo-300 font-bold flex items-center space-x-1">
+                    <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+                    <span>変更</span>
+                </button>
+            </div>
+
+            <!-- Question Card -->
+            <div id="question-card" class="bg-[#141a2e] rounded-3xl p-5 md:p-7 shadow-xl border border-slate-800 relative overflow-hidden mb-5">
+                <div id="q-meta-header" class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4 text-xs">
+                    <div class="flex items-center space-x-2">
+                        <span id="unit-badge" class="px-2.5 py-0.5 rounded-full font-bold bg-indigo-950 text-indigo-300 border border-indigo-800/50">
+                            単元
+                        </span>
+                        <span id="source-badge" class="px-2 py-0.5 rounded-md text-[10px] bg-slate-800 text-slate-400 border border-slate-700">
+                            数値ランダム生成
+                        </span>
+                    </div>
+                    <span id="q-pattern-title" class="text-slate-400 font-medium truncate max-w-[200px]">
+                        パターン
+                    </span>
+                </div>
+
+                <div class="text-slate-100 text-sm md:text-base leading-relaxed font-medium mb-5 whitespace-pre-line" id="q-text">
+                    問題を出題中...
+                </div>
+
+                <div class="bg-[#1c243c] border-l-4 border-indigo-500 p-3.5 rounded-r-xl mb-5">
+                    <p class="font-bold text-indigo-200 text-xs md:text-sm" id="q-prompt">
+                        ---
+                    </p>
+                </div>
+
+                <!-- 選択肢 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5" id="choices-container">
+                </div>
+            </div>
+
+            <!-- Explanation Card -->
+            <div id="explanation-card" class="hidden bg-[#141a2e] rounded-3xl p-5 md:p-7 shadow-xl border border-slate-800 animate-fade-in mb-5">
+                <div id="result-banner" class="rounded-2xl p-4 mb-5 flex items-center space-x-3">
+                </div>
+
+                <h3 class="text-base font-bold text-slate-100 mb-3 flex items-center">
+                    <i class="fa-solid fa-lightbulb text-amber-400 mr-2"></i>解法・解説ステップ
+                </h3>
+
+                <div class="space-y-3 text-xs md:text-sm text-slate-300 leading-relaxed mb-6" id="explanation-content">
+                </div>
+
+                <div class="pt-3 border-t border-slate-800 flex justify-end">
+                    <button onclick="generateNewQuestion()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-xl transition flex items-center justify-center space-x-2 shadow-md shadow-indigo-950/50">
+                        <span>次の問題に進む</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. CBT RESULT CARD VIEW -->
+        <section id="cbt-result-card" class="hidden bg-[#141a2e] rounded-3xl p-6 md:p-8 shadow-xl border border-slate-800 max-w-2xl mx-auto w-full animate-fade-in">
+            <div class="text-center pb-5 border-b border-slate-800 mb-6">
+                <span class="px-3 py-1 bg-emerald-950/80 text-emerald-400 border border-emerald-800/50 rounded-full text-xs font-bold">
+                    CBT TEST RESULT
+                </span>
+                <h2 class="text-2xl font-extrabold text-white mt-2">CBT模擬試験 結果</h2>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3 mb-6">
+                <div class="bg-[#1b233a] p-3.5 rounded-2xl border border-slate-800 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 block mb-0.5">正解数</span>
+                    <p class="text-xl font-black text-indigo-400" id="cbt-res-score">0 / 10</p>
+                </div>
+                <div class="bg-[#1b233a] p-3.5 rounded-2xl border border-slate-800 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 block mb-0.5">正解率</span>
+                    <p class="text-xl font-black text-emerald-400" id="cbt-res-accuracy">0 %</p>
+                </div>
+                <div class="bg-[#1b233a] p-3.5 rounded-2xl border border-slate-800 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 block mb-0.5">解答時間</span>
+                    <p class="text-xl font-black text-purple-400" id="cbt-res-total-time">0分00秒</p>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <button onclick="copyCBTResult()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold transition text-xs shadow-lg shadow-emerald-950/50 flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-copy"></i>
+                    <span>結果をコピー (提出用)</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="openReviewModal()" class="w-full py-3.5 rounded-2xl bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/60 font-bold transition text-xs shadow-lg flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-list-check"></i>
+                    <span>回答振り返り</span>
+                </button>
+                <button onclick="goToLanding()" class="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition text-xs shadow-lg">
+                    トップ画面に戻る
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODALS -->
+    <!-- CBT Modal -->
+    <div id="cbt-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div class="bg-[#141a2e] rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-700 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
+                <h3 class="text-base font-extrabold text-white flex items-center">
+                    <i class="fa-solid fa-laptop-code text-emerald-400 mr-2"></i>CBT模擬試験 (10問 / 12分)
+                </h3>
+                <button onclick="closeCBTModal()" class="text-slate-400 hover:text-slate-200 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <p class="text-xs text-slate-300 mb-3">
+                出題対象とする単元を<strong class="text-amber-400">最大10個まで</strong>選択してください。<br>（選択した単元の中から10問が出題されます）
+            </p>
+
+            <div class="overflow-y-auto flex-grow mb-4 pr-1">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs text-indigo-300 font-bold" id="cbt-unit-select-count">選択中: 0 / 10 個</span>
+                    <button onclick="selectAllCbtUnits()" class="text-[11px] text-slate-400 hover:text-white underline">10個おまかせ選択</button>
+                </div>
+                <div class="grid grid-cols-2 gap-2" id="cbt-unit-checkbox-grid">
+                    <!-- JS生成 -->
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-800 flex space-x-2">
+                <button onclick="closeCBTModal()" class="w-1/3 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition">
+                    キャンセル
+                </button>
+                <button onclick="startCBTWithSelectedUnits()" class="w-2/3 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-play"></i>
+                    <span>テストを開始する</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- STATS MODAL -->
+    <div id="stats-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 md:p-4 animate-fade-in">
+        <div class="bg-[#0f1423] rounded-3xl max-w-2xl w-full p-4 md:p-6 shadow-2xl border border-slate-800 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-800/80 mb-4">
+                <h3 class="text-base font-extrabold text-white flex items-center">
+                    <i class="fa-solid fa-chart-pie text-amber-400 mr-2.5"></i>単元別 成績分析
+                </h3>
+                <button onclick="closeStatsModal()" class="text-slate-400 hover:text-slate-200 p-1.5 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3 mb-4 shrink-0">
+                <div class="bg-[#1b233a] p-3 rounded-2xl border border-slate-800 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 block mb-0.5">総回答数</span>
+                    <p id="stats-total-count" class="text-lg font-black text-indigo-400">0問</p>
+                </div>
+                <div class="bg-[#1b233a] p-3 rounded-2xl border border-slate-800 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 block mb-0.5">全体正答率</span>
+                    <p id="stats-overall-accuracy" class="text-lg font-black text-emerald-400">0%</p>
+                </div>
+                <div class="bg-[#1b233a] p-3 rounded-2xl border border-slate-800 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 block mb-0.5">平均解答時間</span>
+                    <p id="stats-overall-avg-time" class="text-lg font-black text-amber-400">0.0秒</p>
+                </div>
+            </div>
+
+            <div class="overflow-y-auto flex-grow pr-1 space-y-4" id="stats-content-list"></div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800/80 flex justify-between items-center shrink-0">
+                <span class="text-[11px] text-slate-400">自動記録データ</span>
+                <button onclick="closeStatsModal()" class="bg-[#5046e5] hover:bg-[#4338ca] text-white text-xs font-bold py-2.5 px-6 rounded-xl transition shadow-lg">
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- REVIEW MODAL -->
+    <div id="review-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 md:p-4 animate-fade-in">
+        <div class="bg-[#0f1423] rounded-3xl max-w-xl w-full p-4 md:p-6 shadow-2xl border border-slate-800 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-800/80 mb-4">
+                <h3 class="text-base font-extrabold text-white flex items-center">
+                    <i class="fa-solid fa-list-check text-indigo-400 mr-2.5"></i>回答振り返り
+                </h3>
+                <button onclick="closeReviewModal()" class="text-slate-400 hover:text-slate-200 p-1.5 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="overflow-y-auto space-y-4 flex-grow pr-1.5" id="session-review-list"></div>
+            <div class="mt-4 pt-3 border-t border-slate-800/80 flex justify-between items-center shrink-0">
+                <span class="text-xs font-semibold text-slate-400" id="review-count-info">全 0 問</span>
+                <button onclick="closeReviewModal()" class="bg-[#5046e5] hover:bg-[#4338ca] text-white text-xs font-bold py-2.5 px-6 rounded-xl transition shadow-lg">
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HISTORY MODAL -->
+    <div id="history-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div class="bg-[#141a2e] rounded-3xl max-w-md w-full p-5 shadow-2xl border border-slate-700 max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-800">
+                <h3 class="text-base font-extrabold text-white flex items-center">
+                    <i class="fa-solid fa-clock-rotate-left text-teal-400 mr-2"></i>模擬試験の直近10回履歴
+                </h3>
+                <button onclick="closeHistoryModal()" class="text-slate-400 hover:text-slate-200 p-1">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+            <div class="overflow-y-auto space-y-2 flex-grow pr-1" id="global-history-list"></div>
+            <div class="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center">
+                <button onclick="clearGlobalHistory()" class="text-xs text-rose-400 hover:text-rose-300">
+                    <i class="fa-solid fa-trash mr-1"></i>全消去
+                </button>
+                <button onclick="closeHistoryModal()" class="bg-slate-800 text-white text-xs font-bold py-2 px-4 rounded-xl border border-slate-700">
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <footer class="bg-[#0b0f19] border-t border-slate-800/80 py-3 text-center text-[11px] text-slate-500">
+        <p>高卒公務員試験 数的推理演習システム</p>
+    </footer>
+
+    <!-- 読み込み順: core.js → 各単元 → ui.js （通常の<script>なので file:// でも動作） -->
+    <script src="js/core.js"></script>
+    <script src="js/units/u01_concentration.js"></script>
+    <script src="js/units/u02_age.js"></script>
+    <script src="js/units/u03_profit.js"></script>
+    <script src="js/units/u04_average.js"></script>
+    <script src="js/units/u05_equation1.js"></script>
+    <script src="js/units/u06_simultaneous.js"></script>
+    <script src="js/units/u07_indefinite.js"></script>
+    <script src="js/units/u08_traveler.js"></script>
+    <script src="js/units/u09_train.js"></script>
+    <script src="js/units/u10_river.js"></script>
+    <script src="js/units/u11_clock.js"></script>
+    <script src="js/units/u12_speed_other.js"></script>
+    <script src="js/units/u13_inequality.js"></script>
+    <script src="js/units/u14_work.js"></script>
+    <script src="js/units/u15_newton.js"></script>
+    <script src="js/units/u16_ratio.js"></script>
+    <script src="js/units/u17_base.js"></script>
+    <script src="js/units/u18_divisor_multiple.js"></script>
+    <script src="js/units/u19_integer.js"></script>
+    <script src="js/units/u20_magic_square.js"></script>
+    <script src="js/units/u21_alphametic.js"></script>
+    <script src="js/units/u22_sequence.js"></script>
+    <script src="js/units/u23_quantity_other.js"></script>
+    <script src="js/ui.js"></script>
+</body>
+</html>
