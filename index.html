@@ -113,7 +113,7 @@
                 </div>
                 <h1 class="text-2xl font-extrabold text-white mb-2">高卒公務員試験 数的推理</h1>
                 <p class="text-xs md:text-sm text-slate-400 mb-8 leading-relaxed">
-                    全23単元対応・問題演習＆本番形式CBT模擬試験
+                    全23単元対応・数値ランダム演習＆本番形式CBT模擬試験
                 </p>
 
                 <div class="space-y-4">
@@ -232,7 +232,7 @@
                             単元
                         </span>
                         <span id="source-badge" class="px-2 py-0.5 rounded-md text-[10px] bg-slate-800 text-slate-400 border border-slate-700">
-                            ランダム生成
+                            数値ランダム生成
                         </span>
                     </div>
                     <span id="q-pattern-title" class="text-slate-400 font-medium truncate max-w-[200px]">
@@ -342,7 +342,10 @@
             <div class="overflow-y-auto flex-grow mb-4 pr-1">
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-xs text-indigo-300 font-bold" id="cbt-unit-select-count">選択中: 0 / 10 個</span>
-                    <button onclick="selectAllCbtUnits()" class="text-[11px] text-slate-400 hover:text-white underline">10個おまかせ選択</button>
+                    <span class="flex items-center space-x-3">
+                        <button onclick="clearCbtUnits()" class="text-[11px] text-slate-400 hover:text-white underline">全解除</button>
+                        <button onclick="selectAllCbtUnits()" class="text-[11px] text-slate-400 hover:text-white underline">10個おまかせ選択</button>
+                    </span>
                 </div>
                 <div class="grid grid-cols-2 gap-2" id="cbt-unit-checkbox-grid">
                     <!-- JS生成 -->

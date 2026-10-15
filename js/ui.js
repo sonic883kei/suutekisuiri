@@ -71,7 +71,7 @@ const ALL_UNITS = UnitRegistry.list();
         function renderUnitSelectionGrid() {
             const grid = document.getElementById('unit-selection-grid');
             grid.innerHTML = `
-                <button onclick="selectConfigUnit('all')" data-unit="all" class="cfg-unit-btn p-2.5 rounded-xl border text-left transition flex items-center space-x-2 bg-indigo-600 border-indigo-400 text-white font-bold col-span-2 sm:col-span-3">
+                <button onclick="selectConfigUnit('all')" data-unit="all" class="${cfgUnitBtnClass('all', true)}">
                     <i class="fa-solid fa-layer-group text-sm"></i>
                     <span class="text-xs">全23単元 混合演習</span>
                 </button>
@@ -80,20 +80,23 @@ const ALL_UNITS = UnitRegistry.list();
                 const btn = document.createElement('button');
                 btn.onclick = () => selectConfigUnit(u.id);
                 btn.setAttribute('data-unit', u.id);
-                btn.className = 'cfg-unit-btn p-2.5 rounded-xl border border-slate-700 bg-[#1b233a] text-slate-300 text-left transition flex items-center space-x-2 hover:border-slate-600';
+                btn.className = cfgUnitBtnClass(u.id, false);
                 btn.innerHTML = `<span class="text-xs font-bold truncate">${u.name}</span>`;
                 grid.appendChild(btn);
             });
         }
 
+        function cfgUnitBtnClass(unitId, selected) {
+            const wide = unitId === 'all' ? ' col-span-2 sm:col-span-3' : '';   // 「全単元 混合演習」は常に1行ぶんの幅
+            return 'cfg-unit-btn p-2.5 rounded-xl border text-left transition flex items-center space-x-2' + wide +
+                (selected ? ' bg-indigo-600 border-indigo-400 text-white font-bold' : ' border-slate-700 bg-[#1b233a] text-slate-300 hover:border-slate-600');
+        }
+
         function selectConfigUnit(unitId) {
             configUnit = unitId;
             document.querySelectorAll('.cfg-unit-btn').forEach(btn => {
-                if (btn.getAttribute('data-unit') === unitId) {
-                    btn.className = 'cfg-unit-btn p-2.5 rounded-xl border text-left transition flex items-center space-x-2 bg-indigo-600 border-indigo-400 text-white font-bold';
-                } else {
-                    btn.className = 'cfg-unit-btn p-2.5 rounded-xl border border-slate-700 bg-[#1b233a] text-slate-300 text-left transition flex items-center space-x-2 hover:border-slate-600';
-                }
+                const id = btn.getAttribute('data-unit');
+                btn.className = cfgUnitBtnClass(id, id === unitId);
             });
         }
 
@@ -256,8 +259,13 @@ const ALL_UNITS = UnitRegistry.list();
             updateCbtUnitCountText();
         }
 
-        function selectAllCbtUnits() {
-            cbtSelectedUnits = ALL_UNITS.slice(0, 10).map(u => u.id);
+        function selectAllCbtUnits() {   // 10個おまかせ選択（毎回ランダムに10単元）
+            cbtSelectedUnits = shuffleArray(ALL_UNITS.map(u => u.id)).slice(0, 10);
+            renderCbtUnitCheckboxes();
+        }
+
+        function clearCbtUnits() {       // 選択をすべて解除
+            cbtSelectedUnits = [];
             renderCbtUnitCheckboxes();
         }
 
