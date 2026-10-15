@@ -82,6 +82,37 @@ function renderRich(str) { return renderFractions(escapeHTML(str)); }   // 問�
 // ----------------------------------------------------
 // 単元レジストリ: 各 js/units/*.js が register() で自分を登録する
 // ----------------------------------------------------
+
+// 図の描画（q.figure）: {type:'grid', rows:[[セル,...],...]} → 表 / {type:'tri', labels:[頂点3,辺の中点3]} → 三角形(SVG)
+// セルは数値・文字列（'' は空欄）。大文字アルファベット(A,B,X など)は「求める文字」として強調表示する。
+function renderFigure(fig) {
+    if (!fig) return '';
+    if (fig.type === 'grid') {
+        const body = fig.rows.map(r => '<tr>' + r.map(v => {
+            const s = (v === null || v === undefined) ? '' : String(v), unk = /^[A-Za-z]$/.test(s);
+            return `<td class="${unk ? 'fig-unk' : (s === '' ? 'fig-blank' : 'fig-given')}">${escapeHTML(s)}</td>`;
+        }).join('') + '</tr>').join('');
+        return `<table class="fig-grid"><tbody>${body}</tbody></table>`;
+    }
+    if (fig.type === 'calc') {   // 筆算: rows=[{sym:'×', cells:[...], rule:true}, ...]（cells は右詰め済みで長さ同じ。'' は空白）
+        const body = fig.rows.map(r => `<tr class="${r.rule ? 'fig-rule' : ''}"><td class="fig-sym">${escapeHTML(r.sym || '')}</td>` + r.cells.map(v => {
+            const s = (v === null || v === undefined) ? '' : String(v), unk = /^[A-Za-z]$/.test(s);
+            return `<td class="${unk ? 'fig-unk' : (s === '' ? 'fig-blank0' : 'fig-given0')}">${escapeHTML(s)}</td>`;
+        }).join('') + '</tr>').join('');
+        return `<table class="fig-calc"><tbody>${body}</tbody></table>`;
+    }
+    if (fig.type === 'tri') {
+        const pts = [[120, 28], [28, 182], [212, 182], [74, 105], [120, 182], [166, 105]];   // 頂点3つ → 辺の中点3つ(左辺・底辺・右辺)
+        const lines = [[0, 1], [1, 2], [2, 0]].map(([a, b]) => `<line x1="${pts[a][0]}" y1="${pts[a][1]}" x2="${pts[b][0]}" y2="${pts[b][1]}" class="fig-line"/>`).join('');
+        const dots = pts.map((p, i) => {
+            const v = fig.labels && fig.labels[i] !== undefined && fig.labels[i] !== null ? String(fig.labels[i]) : '';
+            return `<circle cx="${p[0]}" cy="${p[1]}" r="17" class="fig-dot"/>` + (v ? `<text x="${p[0]}" y="${p[1] + 5}" text-anchor="middle" class="fig-txt">${escapeHTML(v)}</text>` : '');
+        }).join('');
+        return `<svg viewBox="0 0 240 210" class="fig-svg" role="img" aria-label="三角形の頂点と辺の中点に数を入れる図">${lines}${dots}</svg>`;
+    }
+    return '';
+}
+
 const UnitRegistry = (() => {
     const units = [];
     return {

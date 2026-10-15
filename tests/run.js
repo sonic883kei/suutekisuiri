@@ -674,8 +674,316 @@ function checkU16(q, choices) {
     return nearest === q.correctAnswer && one();
 }
 
+// 記数法(u17): 問題文の数値だけから、別の方法（parseInt / 総当たり）で解き直して照合する
+function checkU17(q, choices) {
+    const t = (q.text + '\n' + q.prompt).replace(/\{\{(\d+)\/(\d+)\}\}/g, '$1/$2'), num = x => Number(String(x).replace(/,/g, ''));
+    const strip = c => c.htmlText.replace(/^.\s*/, '');
+    const onlyOne = (okFn) => { let ok = 0; for (const c of choices) { const v = okFn(strip(c)); if (v === null || v !== c.isCorrect) return false; if (c.isCorrect) ok++; } return ok === 1 && choices.length === 5 && new Set(choices.map(strip)).size === 5; };
+    let m;
+    if (q.title === '？進法から？進法への変換') {
+        m = t.match(/(\d+) 進法の (\d+) を (\d+) 進法で表す/); if (!m) return false;
+        const b1 = num(m[1]), b2 = num(m[3]), v = parseInt(m[2], b1);
+        return [...m[2]].every(d => Number(d) < b1) && v === q.correctAnswer && onlyOne(s => (/^[0-9]+$/.test(s) && [...s].every(d => Number(d) < b2)) ? parseInt(s, b2) === v : null);
+    }
+    if (q.title === '四則演算') {
+        m = t.match(/(\d+) 進法で表された 2 つの数、(\d+) と (\d+) がある.*?その(積|和|差).*?を (\d+) 進法/s); if (!m) return false;
+        const b1 = num(m[1]), b2 = num(m[5]), v1 = parseInt(m[2], b1), v2 = parseInt(m[3], b1), r = m[4] === '積' ? v1 * v2 : (m[4] === '和' ? v1 + v2 : v1 - v2);
+        if (m[4] === '差' && v1 <= v2) return false;
+        return r === q.correctAnswer && onlyOne(s => (/^[0-9]+$/.test(s) && [...s].every(d => Number(d) < b2)) ? parseInt(s, b2) === r : null);
+    }
+    if (q.title === '暗号') {
+        const rows = [...t.matchAll(/^([○●]+)　(\d+|x)$/gm)].map(x => ({ bits: x[1], label: x[2], v: parseInt(x[1].replace(/●/g, '1').replace(/○/g, '0'), 2) }));
+        if (rows.length !== 5 || rows.some(r => r.bits.length !== rows[0].bits.length)) return false;
+        for (const r of rows) if (r.label !== 'x' && Number(r.label) !== r.v) return false;     // 例の行がすべて「●＝1」の2進法と一致する
+        const xr = rows.find(r => r.label === 'x');
+        return xr && xr.v === q.correctAnswer && [1, 2, 3].every(n => rows.some(r => r.label === String(n)));
+    }
+    m = t.match(/10 進法の (\d+) を n 進法で表すと (\d+) になった.*?n 進法で表された (\d+) を 10 進法/s); if (!m) return false;
+    const V = num(m[1]), d1 = m[2], d2 = m[3], bases = [], maxD = Math.max(...[...d1].map(Number));
+    for (let b = maxD + 1; b <= 40; b++) if (parseInt(d1, b) === V) bases.push(b);
+    if (bases.length !== 1 || [...d2].some(d => Number(d) >= bases[0])) return false;
+    const ans = parseInt(d2, bases[0]);
+    return ans === q.correctAnswer && onlyOne(s => /^[0-9]+$/.test(s) ? Number(s) === ans : null);
+}
+
+// 約数・倍数(u18): 問題文の数値だけから、総当たりで解き直して照合する（解の一意性も確認）
+function checkU18(q, choices) {
+    const t = (q.text + '\n' + q.prompt), num = x => Number(String(x).replace(/,/g, ''));
+    const gcd = (a, b) => (b ? gcd(b, a % b) : a), strip = c => c.htmlText.replace(/^.\s*/, '');
+    const choiceOk = (ans) => { let ok = 0; for (const c of choices) { const v = parseInt(strip(c), 10); if (Number.isNaN(v) || (v === ans) !== c.isCorrect) return false; if (c.isCorrect) ok++; } return ok === 1 && choices.length === 5 && new Set(choices.map(strip)).size === 5; };
+    let m;
+    if (q.title === '最小公倍数') {
+        m = t.match(/(\d+) で割っても (\d+) で割っても余りが (\d+) となる 3 けた.*?(\d+) で割ったときの余り/s); if (!m) return false;
+        const [a, b, r, c] = m.slice(1).map(num), sols = [];
+        for (let N = 100; N <= 999; N++) if (N % a === r && N % b === r) sols.push(N);
+        return sols.length === 1 && sols[0] % c === q.correctAnswer && choiceOk(q.correctAnswer);
+    }
+    if (q.title === '最大公約数') {
+        m = t.match(/(\d+)、(\d+)、(\d+) をある 2 桁の自然数で割ったら、どれも余りが (\d+) となった/); if (!m) return false;
+        const [x1, x2, x3, r] = m.slice(1).map(num), sols = [];
+        for (let M = 10; M <= 99; M++) if (M > r && [x1, x2, x3].every(x => x % M === r)) sols.push(M);
+        return sols.length === 1 && sols[0] === q.correctAnswer;
+    }
+    if (q.title === '割る数と余り（1）') {
+        m = t.match(/これを (\d+) で割ると (\d+) が余り、(\d+) で割ると (\d+) が余る/); if (!m) return false;
+        const [a, ra, b, rb] = m.slice(1).map(num), sols = [];
+        for (let N = 10; N <= 99; N++) if (N % a === ra && N % b === rb) sols.push(N);
+        return sols.length === 1 && sols[0] % 10 === q.correctAnswer && choiceOk(q.correctAnswer);
+    }
+    if (q.title === '割る数と余り（2）') {
+        m = t.match(/これを (\d+) で割ると (\d+) 余り、(\d+) で割ると (\d+) 余り、(\d+) で割ると (\d+) 余る.*?(\d+) で割ったときの余り/s); if (!m) return false;
+        const [m1, r1, m2, r2, m3, r3, d] = m.slice(1).map(num), sols = [];
+        for (let N = 10; N <= 99; N++) if (N % m1 === r1 && N % m2 === r2 && N % m3 === r3) sols.push(N);
+        return sols.length >= 1 && new Set(sols.map(N => N % d)).size === 1 && sols[0] % d === q.correctAnswer && choiceOk(q.correctAnswer);
+    }
+    if (q.title === '素因数分解と約数の個数') {
+        m = t.match(/(\d+) の約数について考える/); if (!m) return false;
+        const N = num(m[1]); let cnt = 0; for (let d = 1; d <= N; d++) if (N % d === 0) cnt++;
+        return cnt === q.correctAnswer && choiceOk(cnt);
+    }
+    if (q.title === '最小公倍数と最大公約数・B') {
+        m = t.match(/最大公約数が (\d+) で、最小公倍数が (\d+) で、AはBより (\d+) 大きい/); if (!m) return false;
+        const [g, L, diff] = m.slice(1).map(num), sols = [];
+        for (let B = 1; B <= 2000; B++) { const A = B + diff; if (gcd(A, B) === g && A * B / g === L) sols.push(A + B); }
+        return sols.length === 1 && sols[0] === q.correctAnswer && choiceOk(sols[0]);
+    }
+    m = t.match(/AB × (\d+) ＝ (\d+) × BA/); if (!m) return false;
+    const [p, qq] = m.slice(1).map(num), sols = [];
+    for (let A = 1; A <= 9; A++) for (let B = 1; B <= 9; B++) if ((10 * A + B) * p === qq * (10 * B + A)) sols.push([A, B, (10 * A + B) * p]);
+    if (sols.length < 2) return false;
+    const best = sols.reduce((mm, s) => (s[2] > mm[2] ? s : mm), sols[0]);
+    return best[0] + best[1] === q.correctAnswer;
+}
+
+// 整数(u19): 問題文の数値だけから、総当たりで解き直して照合する（解の一意性も確認）
+function checkU19(q, choices) {
+    const t = (q.text + '\n' + q.prompt), num = x => Number(String(x).replace(/,/g, ''));
+    const strip = c => c.htmlText.replace(/^.\s*/, '');
+    const oneCorrect = () => { let ok = 0; for (const c of choices) if (c.isCorrect) ok++; return ok === 1 && choices.length === 5 && new Set(choices.map(strip)).size === 5; };
+    let m;
+    if (q.title === '計算式を満たす整数') {
+        const line = t.split('\n').find(l => /＝ C$/.test(l)); if (!line) return false;
+        const parts = line.split('＝').map(x => x.trim()), sols = [];
+        const ev = (e, a, b, c) => Function('A', 'B', 'C', `return ${e.replace(/×/g, '*').replace(/－/g, '-')};`)(a, b, c);
+        for (let a = 1; a <= 9; a++) for (let b = 1; b <= 9; b++) for (let c = 1; c <= 9; c++) { if (new Set([a, b, c]).size < 3) continue; if (parts.every(e => ev(e, a, b, c) === ev(parts[0], a, b, c))) sols.push(a + b + c); }
+        return sols.length === 1 && sols[0] === q.correctAnswer;
+    }
+    if (q.title === '連続する整数') {
+        m = t.match(/割った値が (\d+) となる.*?最も(大きい|小さい)数/s); if (!m) return false;
+        const V = num(m[1]), sols = [];
+        for (let n = 2; n <= 500; n++) if ((n - 1) * n * (n + 1) === V * 3 * n) sols.push(m[2] === '大きい' ? n + 1 : n - 1);
+        return sols.length === 1 && sols[0] === q.correctAnswer;
+    }
+    if (q.title === '各桁の操作') {
+        m = t.match(/(一の位|十の位)が (\d) である 2 桁の自然数Aと、(一の位|十の位)が (\d) である 2 桁の自然数Bがある.*?Aより (\d+) (小さく|大きく)なり.*?Bより (\d+) (小さく|大きく)なる/s); if (!m) return false;
+        const fits = (n, pos, v) => (pos === '一の位' ? n % 10 === v : Math.floor(n / 10) === v), swap = n => (n % 10) * 10 + Math.floor(n / 10);
+        const dA = (m[6] === '小さく' ? -1 : 1) * num(m[5]), dB = (m[8] === '小さく' ? -1 : 1) * num(m[7]), As = [], Bs = [];
+        for (let n = 10; n <= 99; n++) { if (n % 10 === 0) continue; if (fits(n, m[1], num(m[2])) && swap(n) - n === dA) As.push(n); if (fits(n, m[3], num(m[4])) && swap(n) - n === dB) Bs.push(n); }
+        return As.length === 1 && Bs.length === 1 && As[0] + Bs[0] === q.correctAnswer && oneCorrect() && choices.some(c => c.isCorrect && Number(strip(c)) === q.correctAnswer);
+    }
+    m = t.match(/「(\d)」のカードは([ABC])が持ち、また、([ABC])が持つカードの三つの数の積と、([ABC])が持つカードの三つの数の積は等しかった/); if (!m) return false;
+    const g = num(m[1]), holder = m[2], pair = [m[3], m[4]], cards = [1, 2, 3, 4, 5, 6, 7, 8, 9], valid = [];
+    const rec = (idx, hand) => { if (idx === 9) { if (hand.A.length === 3 && hand.B.length === 3 && hand.C.length === 3 && hand[holder].includes(g)) { const pr = a => a.reduce((x, y) => x * y, 1); if (pr(hand[pair[0]]) === pr(hand[pair[1]])) valid.push({ A: hand.A.slice(), B: hand.B.slice(), C: hand.C.slice() }); } return; } for (const X of 'ABC') if (hand[X].length < 3) { hand[X].push(cards[idx]); rec(idx + 1, hand); hand[X].pop(); } };
+    rec(0, { A: [], B: [], C: [] });
+    if (valid.length < 2) return false;
+    let certainCount = 0, ok = 0;
+    for (const c of choices) {
+        const mm = strip(c).match(/「(\d)」のカードは([ABC])が持っている/); if (!mm) return false;
+        const certain = valid.every(h => h[mm[2]].includes(Number(mm[1])));
+        if (certain !== c.isCorrect) return false;
+        if (certain) certainCount++; if (c.isCorrect) ok++;
+    }
+    return certainCount === 1 && ok === 1 && choices.length === 5;
+}
+
+
+// ⑳ 魔方陣: 3×3 は 9! 総当たり、4×4 は行の組合せDFSで全魔方陣(7040)を別途列挙して埋め込み表と一致を確認、三角形は 6! 総当たり
+const U20 = {};
+function u20Init() {
+    if (U20.ok) return;
+    const perm = (arr, f) => { const rec = (p, used) => { if (p.length === arr.length) return f(p); for (let i = 0; i < arr.length; i++) if (!used[i]) { used[i] = 1; p.push(arr[i]); rec(p, used); p.pop(); used[i] = 0; } }; rec([], []); };
+    const L3 = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    const enum3 = a => { const out = []; perm([...Array(9).keys()].map(i => a + i), p => { const s = p[0] + p[1] + p[2]; if (L3.every(l => p[l[0]] + p[l[1]] + p[l[2]] === s)) out.push(p.slice()); }); return out; };
+    U20.sq3_1 = enum3(1);
+    const e13 = enum3(13), tr = U20.sq3_1.map(p => p.map(v => v + 12).join(','));
+    U20.tr3ok = U20.sq3_1.length === 8 && e13.length === 8 && e13.every(p => tr.includes(p.join(',')));   // 平行移動しても同じ（a=13 は総当たりで直接確認）
+    // 4×4 全列挙
+    const rows = []; for (let a = 1; a <= 16; a++) for (let b = 1; b <= 16; b++) for (let c = 1; c <= 16; c++) { const d = 34 - a - b - c; if (d >= 1 && d <= 16 && new Set([a, b, c, d]).size === 4) rows.push([a, b, c, d]); }
+    const all = [], mask = r => r.reduce((m, v) => m | (1 << v), 0);   // 1・2行目を選ぶ → 3行目の各列は 34−(上2つ)−4行目、と絞って全列挙
+    for (const r1 of rows) { const m1 = mask(r1);
+        for (const r2 of rows) { if (mask(r2) & m1) continue; const m12 = m1 | mask(r2), t = r1.map((v, j) => 34 - v - r2[j]), rest = [];
+            for (let v = 1; v <= 16; v++) if (!(m12 & (1 << v))) rest.push(v);
+            const x = [], y = [];
+            const rc = (j, usedm) => {
+                if (j === 4) { const sx = x.reduce((p, q) => p + q, 0), sy = y.reduce((p, q) => p + q, 0); if (sx !== 34 || sy !== 34) return; const g = [...r1, ...r2, ...x, ...y];
+                    if (g[0] + g[5] + g[10] + g[15] === 34 && g[3] + g[6] + g[9] + g[12] === 34) all.push(g); return; }
+                for (const v of rest) { if (usedm & (1 << v)) continue; const w = t[j] - v; if (w < 1 || w > 16 || w === v || !rest.includes(w) || (usedm & (1 << w))) continue; x.push(v); y.push(w); rc(j + 1, usedm | (1 << v) | (1 << w)); x.pop(); y.pop(); }
+            };
+            rc(0, 0); } }
+    U20.sq4 = all;
+    const mine = vm.runInThisContext('msMagic4All()').map(x => x.join(',')).sort(), ref = all.map(x => x.join(',')).sort();
+    U20.tab4ok = all.length === 7040 && mine.length === 7040 && mine.every((x, i) => x === ref[i]);
+    U20.ok = true;
+    console.log(`  [u20 前提] 3×3魔方陣(1〜9)=${U20.sq3_1.length}個, 平行移動の一致=${U20.tr3ok}, 4×4魔方陣=${all.length}個, 埋め込み表との一致=${U20.tab4ok}`);
+}
+function checkU20(q, choices) {
+    u20Init(); if (!U20.tr3ok || !U20.tab4ok) return false;
+    const strip = c => Number(c.htmlText.replace(/^.\s*/, '').replace(/,/g, '')), t = q.text + '\n' + q.prompt;
+    const one = () => choices.length === 5 && choices.filter(c => c.isCorrect).length === 1 && new Set(choices.map(c => c.value)).size === 5;
+    const cell = v => (v === '' ? null : (typeof v === 'number' ? v : v));
+    if (q.title === '3×3の魔方陣') {
+        const m = t.match(/(\d+)〜(\d+) の連続する9個/); if (!m) return false; const a = Number(m[1]); if (Number(m[2]) !== a + 8) return false;
+        const flat = q.figure.rows.flat(), xi = flat.indexOf('X'); if (xi < 0 || flat.filter(v => v === 'X').length !== 1) return false;
+        const gv = flat.map(v => (typeof v === 'number' ? v : null)), nGiven = gv.filter(v => v !== null).length;
+        if (!new RegExp(`図のように${nGiven}つの数`).test(t)) return false;
+        const xs = new Set(); U20.sq3_1.forEach(p => { const sq = p.map(v => v + a - 1); if (gv.every((v, i) => v === null || sq[i] === v)) xs.add(sq[xi]); });
+        const lo = Math.min(...gv.filter(v => v !== null)); if (lo < a || Math.max(...gv.filter(v => v !== null)) > a + 8) return false;
+        return xs.size === 1 && xs.has(q.correctAnswer) && one() && choices.some(c => c.isCorrect && strip(c) === q.correctAnswer) && choices.every(c => c.value >= 1)
+            && choices.map(c => c.value).sort((x, y) => x - y).every((v, i, arr) => i === 0 || v - arr[i - 1] === 1);
+    }
+    if (q.title === '4×4の魔方陣') {
+        const flat = q.figure.rows.flat(), ai = flat.indexOf('A'), bi = flat.indexOf('B'); if (ai < 0 || bi < 0) return false;
+        const gv = flat.map(v => (typeof v === 'number' ? v : null)), sums = new Set(); let cnt = 0;
+        if (new Set(gv.filter(v => v !== null)).size !== gv.filter(v => v !== null).length) return false;
+        for (const sq of U20.sq4) if (gv.every((v, i) => v === null || sq[i] === v)) { cnt++; sums.add(sq[ai] + sq[bi]); }
+        return cnt >= 1 && sums.size === 1 && sums.has(q.correctAnswer) && one() && choices.some(c => c.isCorrect && strip(c) === q.correctAnswer)
+            && choices.map(c => c.value).sort((x, y) => x - y).every((v, i, arr) => i === 0 || v - arr[i - 1] === 1);
+    }
+    // 魔辺三角形
+    const m = t.match(/(\d+)〜(\d+) の連続する6個/); if (!m) return false; const a = Number(m[1]); if (Number(m[2]) !== a + 5) return false;
+    const imp = /考えられないもの/.test(q.prompt); if (!imp && !/考えられるもの/.test(q.prompt)) return false;
+    const feas = new Set(), vals = [0,1,2,3,4,5].map(i => a + i);
+    const rec = (p, used) => { if (p.length === 6) { const s = p[0] + p[3] + p[1]; if (p[1] + p[4] + p[2] === s && p[2] + p[5] + p[0] === s) feas.add(s); return; } for (let i = 0; i < 6; i++) if (!(used >> i & 1)) rec([...p, vals[i]], used | 1 << i); };
+    rec([], 0);
+    if (!one() || q.figure.type !== 'tri') return false;
+    for (const c of choices) { const v = strip(c), ok = imp ? !feas.has(v) : feas.has(v); if (ok !== c.isCorrect) return false; }
+    return choices.find(c => c.isCorrect).value === q.correctAnswer && choices.map(c => c.value).every((v, i, arr) => i === 0 || v - arr[i - 1] === 1);
+}
+
+// ㉑ 覆面算: 図(q.figure)の文字と数字だけを読み取り、別方式（全組合せの総当たり）で答えを求めて照合する
+const U21cache = {};
+function checkU21(q, choices) {
+    const fig = q.figure; if (!fig || fig.type !== 'calc') return false;
+    const rows = fig.rows.map(r => r.cells.filter(c => c !== ''));
+    const oneOk = choices.length === 5 && choices.filter(c => c.isCorrect).length === 1 && new Set(choices.map(c => c.value)).size === 5
+        && choices.map(c => c.value).sort((x, y) => x - y).every((v, i, a) => i === 0 || v - a[i - 1] === 1) && choices.some(c => c.isCorrect && c.value === q.correctAnswer);
+    const key = q.title + JSON.stringify(fig) + q.prompt;
+    if (U21cache[key] !== undefined) return U21cache[key] === q.correctAnswer && oneOk;
+    let ans = null;
+    const num = (cells, m) => Number(cells.map(c => (/^[0-9]$/.test(c) ? c : m[c])).join(''));
+    const fits = (cells, n, m) => { const s = String(n); return s.length === cells.length && cells.every((c, i) => /^[0-9]$/.test(c) ? c === s[i] : m[c] === Number(s[i])); };
+    if (q.title === '加減の筆算') {
+        const sols = [];
+        for (let a = 1; a <= 9; a++) for (let b = 1; b <= 9; b++) for (let c = 1; c <= 9; c++) { if (new Set([a, b, c]).size < 3) continue; const m = { a, b, c }; if (num(rows[0], m) + num(rows[1], m) === num(rows[2], m)) sols.push(a + b + c); }
+        if (sols.length === 1) ans = sols[0];
+    } else if (q.title === '掛け算の筆算') {
+        const sols = [];
+        for (let A = 1; A <= 9; A++) for (let B = 1; B <= 9; B++) for (let C = 1; C <= 9; C++) {
+            if (new Set([A, B, C]).size < 3) continue; const m = { A, B, C }, top = num(rows[0], m), mul = num(rows[1], m);
+            if (fits(rows[2], top * (mul % 10), m) && fits(rows[3], top * Math.floor(mul / 10), m) && fits(rows[4], top * mul, m)) sols.push(A + B + C);
+        }
+        if (sols.length === 1) ans = sols[0];
+    } else if (q.title === '掛け算の筆算・B') {
+        const numerals = [...new Set(rows.flat().filter(c => /^[0-9]$/.test(c)).map(Number))], L = q.prompt.match(/^([A-Z]) に入る/)[1];
+        if (numerals.length !== 2 || !new RegExp(`${numerals.join(' と ')}|${numerals.slice().reverse().join(' と ')} を除く`).test(q.text)) return false;
+        const vals = new Set();
+        for (let top = 100; top <= 999; top++) for (let mul = 10; mul <= 99; mul++) {
+            const cs = [[rows[0], top], [rows[1], mul], [rows[2], top * (mul % 10)], [rows[3], top * Math.floor(mul / 10)], [rows[4], top * mul]], m = {}; let good = true;
+            for (const [cells, n] of cs) { const s = String(n); if (s.length !== cells.length) { good = false; break; } for (let i = 0; i < cells.length && good; i++) { const c = cells[i], d = Number(s[i]); if (/^[0-9]$/.test(c)) { if (Number(c) !== d) good = false; } else { if (numerals.includes(d)) good = false; else if (m[c] === undefined) m[c] = d; else if (m[c] !== d) good = false; } } if (!good) break; }
+            if (good && m[L] !== undefined) vals.add(m[L]);
+        }
+        if (vals.size === 1) ans = [...vals][0];
+    } else return false;
+    // 図の体裁: 各行の長さが揃っている・2行目の最後は空白
+    const W = fig.rows[0].cells.length; if (!fig.rows.every(r => r.cells.length === W)) return false;
+    if (q.title !== '加減の筆算' && fig.rows[3].cells[W - 1] !== '') return false;
+    U21cache[key] = ans;
+    return ans === q.correctAnswer && oneOk;
+}
+
+// ㉒ 数列・規則: 問題文から条件を読み取り、公式を使わず「実際に並べて足す／順に数える」方式で答えを求めて照合する
+function checkU22(q, choices) {
+    const t = q.text, strip = c => Number(c.htmlText.replace(/^.\s*/, '').replace(/,/g, ''));
+    const oneOk = choices.length === 5 && choices.filter(c => c.isCorrect).length === 1 && new Set(choices.map(c => c.value)).size === 5 && choices.every(c => c.value > 0)
+        && choices.every(c => strip(c) === c.value) && choices.some(c => c.isCorrect && c.value === q.correctAnswer);
+    let m, ans;
+    if (q.title === '等差数列の項') {
+        m = t.match(/数列 ([\d、]+)……について、(?:第 (\d+) 項の数と)?第 (\d+) 項の数/); if (!m) return false;
+        const sh = m[1].split('、').map(Number), d = sh[1] - sh[0]; if (!sh.every((v, i) => i === 0 || v - sh[i - 1] === d)) return false;
+        const seq = [sh[0]]; for (let i = 1; i < 100; i++) seq.push(seq[i - 1] + d);
+        ans = (m[2] ? seq[Number(m[2]) - 1] : 0) + seq[Number(m[3]) - 1];
+        if (!!m[2] !== /和として/.test(t)) return false;
+    } else if (q.title === '等差数列の和') {
+        m = t.match(/^(\d+) 以下の正の整数のうち、(奇数|偶数|(\d+) の倍数|(\d+) で割ると (\d+) 余る数)を足し合わせた/); if (!m) return false;
+        const N = Number(m[1]); ans = 0;
+        for (let n = 1; n <= N; n++) { const ok = m[2] === '奇数' ? n % 2 === 1 : m[2] === '偶数' ? n % 2 === 0 : m[3] ? n % Number(m[3]) === 0 : n % Number(m[4]) === Number(m[5]); if (ok) ans += n; }
+    } else if (q.title === '階差数列') {
+        const line = t.split('\n')[1].replace('　……', ''), toks = line.split('、'), iA = toks.indexOf('（A）'), iB = toks.indexOf('（B）');
+        if (iA < 5 || iB !== toks.length - 1) return false;
+        const v = toks.map(x => (/^\d+$/.test(x) ? Number(x) : null)), df = [1, 2, 3, 4].map(i => v[i] - v[i - 1]), e = df[1] - df[0];
+        if (!df.every((x, i) => i === 0 || x - df[i - 1] === e) || e <= 0) return false;
+        const full = [v[0]]; for (let i = 1; i < toks.length; i++) full.push(full[i - 1] + df[0] + (i - 1) * e);
+        for (let i = 0; i < toks.length; i++) if (v[i] !== null && v[i] !== full[i]) return false;     // 見えている数がすべて合う
+        ans = full[iA] + full[iB];
+    } else if (q.title === '集合（倍数の和）') {
+        m = t.match(/^1 から (\d+) までの自然数のうち、(\d+) の倍数及び (\d+) の倍数の和/); if (!m) return false;
+        ans = 0; for (let n = 1; n <= Number(m[1]); n++) if (n % Number(m[2]) === 0 || n % Number(m[3]) === 0) ans += n;
+    } else if (q.title === '数字配列') {
+        m = t.match(/左から (\d+) 列目、上から (\d+) 行目/); if (!m) return false;
+        const c = Number(m[1]), r = Number(m[2]), grid = {};
+        let n = 1; for (let k = 1; k <= 80 && grid[r + ',' + c] === undefined; k++) for (let col = 1; col <= k; col++) grid[(k - col + 1) + ',' + col] = n++;   // k 番目の斜めを左下→右上に
+        ans = grid[r + ',' + c];
+        const fig = q.figure.rows; for (let i = 0; i < 5; i++) for (let j = 0; j < 6; j++) { const w = i + j + 1 <= 5 ? grid[(i + 1) + ',' + (j + 1)] : ''; if (grid[(i + 1) + ',' + (j + 1)] === undefined && w !== '') return false; if (i + j + 1 <= 5 && fig[i][j] !== w) return false; }
+    } else return false;
+    return ans === q.correctAnswer && oneOk;
+}
+
+// ㉓ その他の数量: 問題文（と表）から数値を読み取り、別方式（総当たり・UTC換算・個別の部分集合探索）で答えを求めて照合する
+function checkU23(q, choices) {
+    const t = q.text, num = x => Number(String(x).replace(/,/g, '')), strip = c => c.htmlText.replace(/^.\s*/, '');
+    const oneOk = choices.length === 5 && choices.filter(c => c.isCorrect).length === 1 && new Set(choices.map(c => c.value)).size === 5 && choices.every(c => c.value > 0) && choices.some(c => c.isCorrect && c.value === q.correctAnswer);
+    let m, ans;
+    if (q.title === '最大・最小') {
+        m = t.match(/1 個 (\d+) 円で売ると、1 日に (\d+) 個売れる。.*?1 個の値段を (\d+) 円(上げる|下げる)ごとに、1 日の売り上げ個数は (\d+) 個ずつ(減る|増える)という/); if (!m) return false;
+        const p = num(m[1]), n = num(m[2]), x = num(m[3]), up = m[4] === '上げる', y = num(m[5]); if ((m[6] === '減る') !== up) return false;
+        ans = 0; for (let k = 0; k <= 2000; k++) { const pr = p + (up ? 1 : -1) * x * k, qt = n - (up ? 1 : -1) * y * k; if (pr > 0 && qt >= 0) ans = Math.max(ans, pr * qt); }
+        return ans === q.correctAnswer && oneOk && choices.every(c => strip(c).endsWith('円') && num(strip(c).replace(/[^\d,]/g, '')) === c.value) && choices.map(c => c.value).sort((a, b) => a - b).every((v, i, a) => i === 0 || v - a[i - 1] === a[1] - a[0]);
+    }
+    if (q.title === '時差') {
+        const tm = s => { const mm = s.match(/(午前|午後) (\d+) 時 (\d+) 分/); return (mm[1] === '午後' ? 12 : 0) * 60 + num(mm[2]) * 60 + num(mm[3]); };
+        m = t.match(/成田発(午[前後] \d+ 時 \d+ 分)の便.*?、(.+?)には同日の(午[前後] \d+ 時 \d+ 分)に到着.*?、(.+?)発(午[前後] \d+ 時 \d+ 分)の便.*?、(.+?)には同日の(午[前後] \d+ 時 \d+ 分)に到着.*?、(.+?)は (\d+) 時間、(.+?)は (\d+) 時間遅れて/);
+        if (!m) return false;
+        const [d0, a1, d1, a2] = [m[1], m[3], m[5], m[7]].map(tm), L1 = num(m[9]), L2 = num(m[11]);
+        const utc = (loc, L) => loc - (9 - L) * 60;                       // 現地時刻(日本より L 時間遅れ)→UTC（日本は UTC+9）
+        ans = (utc(a1, L1) - (d0 - 9 * 60)) + (utc(a2, L2) - utc(d1, L1));
+        return ans === q.correctAnswer && oneOk && choices.map(c => c.value).sort((a, b) => a - b).every((v, i, a) => i === 0 || v - a[i - 1] === 30)
+            && choices.every(c => { const mm = strip(c).match(/^(\d+)時間(?:(\d+)分)?$/); return mm && num(mm[1]) * 60 + num(mm[2] || 0) === c.value; });
+    }
+    if (q.title === '表の理解') {
+        const nq = num(t.match(/問題数は (\d+) 題/)[1]), pts = [...t.matchAll(/問 \d+ が (\d+) 点/g)].map(x => num(x[1])), wrongAsk = /「正答できなかった問題」/.test(t);
+        const sc = q.figure.rows[0].slice(1), cn = q.figure.rows[1].slice(1);
+        if (pts.length !== nq || cn.reduce((a, b) => a + b, 0) !== num(t.match(/^(\d+) 人の受験者/)[1])) return false;
+        ans = 0;
+        sc.forEach((s, i) => {
+            const subs = []; for (let mask = 0; mask < (1 << nq); mask++) { let sum = 0, c = 0; for (let j = 0; j < nq; j++) if (mask >> j & 1) { sum += pts[j]; c++; } if (sum === s) subs.push(c); }
+            if (subs.length !== 1) ans = NaN; else ans += (wrongAsk ? nq - subs[0] : subs[0]) * cn[i];
+        });
+        return ans === q.correctAnswer && oneOk && choices.every(c => strip(c) === c.value + '題');
+    }
+    // 両替
+    m = t.match(/1 (\S+?)当たり (\d+) 円で.*?旅行先で (\d+) \S+を使った。.*?1 \S+当たり (\d+) 円で両替できた/); if (!m) return false;
+    const r1 = num(m[2]), s = num(m[3]), r2 = num(m[4]);
+    if (/円は 1 /.test(t) || /日本で ([\d,]+) 円を/.test(t)) {      // 円に戻った金額を求める型
+        const X = num(t.match(/日本で ([\d,]+) 円を/)[1]); let found = []; for (let u = 1; u <= 100000; u++) if (u * r1 === X) found.push((u - s) * r2); if (found.length !== 1) return false; ans = found[0];
+    } else {
+        const Y = num(t.match(/ので ([\d,]+) 円になった/)[1]); let found = []; for (let u = s + 1; u <= 100000; u++) if ((u - s) * r2 === Y) found.push(u * r1); if (found.length !== 1) return false; ans = found[0];
+    }
+    return ans === q.correctAnswer && oneOk && choices.every(c => strip(c).endsWith('円') && num(strip(c).replace(/[^\d,]/g, '')) === c.value);
+}
+
 console.log(`単元数: ${R.UnitRegistry.list().length} / 各単元 ${N} 回生成\n`);
 for (const u of R.UnitRegistry.list()) {
+    if (process.env.ONLY && !process.env.ONLY.split(',').includes(u.id)) continue;
     const issues = {};
     const note = (k, ex) => { issues[k] = issues[k] || { n: 0, ex }; issues[k].n++; };
     const seen = new Set();
@@ -687,13 +995,20 @@ for (const u of R.UnitRegistry.list()) {
         if (!Number.isFinite(q.correctAnswer)) note('答えが数値でない', `${q.title}: ${q.correctAnswer}`);
         else {
             if (!q.decimals && !q.mixed && !q.fraction && !Number.isInteger(q.correctAnswer * (q.allowHalf ? 2 : 1))) note('答えが整数でない（0.5刻みの問題は allowHalf を指定）', `${q.title}: ${q.text} → ${q.correctAnswer}`);
-            if (q.correctAnswer <= 0) note('答えが0以下', `${q.title}: ${q.text} → ${q.correctAnswer}`);
+            if (q.correctAnswer < 0 || (q.correctAnswer === 0 && !q.allowZero)) note('答えが0以下', `${q.title}: ${q.text} → ${q.correctAnswer}`);
         }
         if (/NaN|undefined|Infinity/.test(JSON.stringify(q))) note('NaN/undefined混入', `${q.title}: ${q.text}`);
         const ch = R.generateChoices(q);
         if (ch.length !== 5 || ch.filter(c => c.isCorrect).length !== 1) note('選択肢が5個/正解1つでない', q.title);
         seen.add(q.text + q.prompt);
         if (u.id === 'u10' && !checkU10(q, ch)) note('u10: 別解法と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
+        if (u.id === 'u23' && !checkU23(q, ch)) note('u23: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
+        if (u.id === 'u22' && !checkU22(q, ch)) note('u22: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
+        if (u.id === 'u21' && !checkU21(q, ch)) note('u21: 総当たりと不一致', q.title + ' ' + (q.prompt));
+        if (u.id === 'u20' && !checkU20(q, ch)) note('u20: 総当たりと不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
+        if (u.id === 'u19' && !checkU19(q, ch)) note('u19: 総当たりと不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
+        if (u.id === 'u18' && !checkU18(q, ch)) note('u18: 総当たりと不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
+        if (u.id === 'u17' && !checkU17(q, ch)) note('u17: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u16' && !checkU16(q, ch)) note('u16: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u15' && !checkU15(q, ch)) note('u15: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u14' && !checkU14(q, ch)) note('u14: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));

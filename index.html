@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>数的推理 演習＆CBT模擬試験</title>
+    <title>高卒公務員試験 数的推理 演習＆CBT模擬試験</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -34,6 +34,22 @@
         .frac { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; margin: 0 0.15em; line-height: 1.15; font-size: 0.95em; }
         .frac-n { border-bottom: 1.5px solid currentColor; padding: 0 0.3em; }
         .frac-d { padding: 0 0.3em; }
+        /* 図（魔方陣・三角形）: q.figure を core.js の renderFigure が描画 */
+        .fig-grid { border-collapse: collapse; margin: 0 auto; }
+        .fig-grid td { width: 2.8rem; height: 2.8rem; border: 2px solid #64748b; text-align: center; font-weight: 700; font-size: 1.05rem; }
+        .fig-grid td.fig-given { color: #e2e8f0; background: #1b233a; }
+        .fig-grid td.fig-unk { color: #fde68a; background: rgba(250, 204, 21, 0.18); }
+        .fig-grid td.fig-blank { background: #141b30; }
+        .fig-calc { border-collapse: collapse; margin: 0 auto; font-variant-numeric: tabular-nums; }
+        .fig-calc td { min-width: 1.9rem; height: 2.1rem; text-align: center; font-weight: 700; font-size: 1.1rem; padding: 0 0.1rem; }
+        .fig-calc td.fig-sym { color: #94a3b8; padding-right: 0.5rem; }
+        .fig-calc td.fig-given0 { color: #e2e8f0; }
+        .fig-calc td.fig-unk { color: #fde68a; background: rgba(250, 204, 21, 0.18); border-radius: 0.3rem; }
+        .fig-calc tr.fig-rule td { border-bottom: 2px solid #94a3b8; }
+        .fig-svg { width: 15rem; max-width: 100%; height: auto; display: block; margin: 0 auto; }
+        .fig-line { stroke: #94a3b8; stroke-width: 2.5; }
+        .fig-dot { fill: #1b233a; stroke: #94a3b8; stroke-width: 2.5; }
+        .fig-txt { fill: #e2e8f0; font-weight: 700; font-size: 17px; }
         #explanation-content strong {
             color: #c7d2fe;
             font-weight: 700;
@@ -97,7 +113,7 @@
                 </div>
                 <h1 class="text-2xl font-extrabold text-white mb-2">高卒公務員試験 数的推理</h1>
                 <p class="text-xs md:text-sm text-slate-400 mb-8 leading-relaxed">
-                    全23単元対応・演習＆本番形式CBT模擬試験
+                    全23単元対応・数値ランダム演習＆本番形式CBT模擬試験
                 </p>
 
                 <div class="space-y-4">
@@ -108,7 +124,7 @@
                             </div>
                             <div>
                                 <h3 class="text-sm md:text-base font-bold">通常 問題演習モード</h3>
-                                <p class="text-[11px] text-indigo-200 font-normal">単元を選んで問題に挑戦</p>
+                                <p class="text-[11px] text-indigo-200 font-normal">単元を選んでランダム数値問題に挑戦</p>
                             </div>
                         </div>
                         <i class="fa-solid fa-chevron-right text-indigo-200 group-hover:translate-x-1 transition-transform"></i>
@@ -121,7 +137,7 @@
                             </div>
                             <div>
                                 <h3 class="text-sm md:text-base font-bold">CBT 模擬試験モード</h3>
-                                <p class="text-[11px] text-emerald-200 font-normal">最大10単元を選択　10問12分テスト</p>
+                                <p class="text-[11px] text-emerald-200 font-normal">最大10単元を選択！10問12分テスト</p>
                             </div>
                         </div>
                         <i class="fa-solid fa-chevron-right text-emerald-200 group-hover:translate-x-1 transition-transform"></i>
@@ -216,7 +232,7 @@
                             単元
                         </span>
                         <span id="source-badge" class="px-2 py-0.5 rounded-md text-[10px] bg-slate-800 text-slate-400 border border-slate-700">
-                           ランダム生成モード
+                            数値ランダム生成
                         </span>
                     </div>
                     <span id="q-pattern-title" class="text-slate-400 font-medium truncate max-w-[200px]">
@@ -227,6 +243,8 @@
                 <div class="text-slate-100 text-sm md:text-base leading-relaxed font-medium mb-5 whitespace-pre-line" id="q-text">
                     問題を出題中...
                 </div>
+
+                <div id="q-figure" class="hidden mb-5"></div>
 
                 <div class="bg-[#1c243c] border-l-4 border-indigo-500 p-3.5 rounded-r-xl mb-5">
                     <p class="font-bold text-indigo-200 text-xs md:text-sm" id="q-prompt">

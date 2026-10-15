@@ -142,6 +142,9 @@ const ALL_UNITS = UnitRegistry.list();
             document.getElementById('source-badge').innerText = sourceLabel || '数値ランダム';
             document.getElementById('q-pattern-title').innerText = currentQuestion.title || '問題';
             document.getElementById('q-text').innerHTML = renderRich(currentQuestion.text || '');
+            const figEl = document.getElementById('q-figure');
+            figEl.innerHTML = renderFigure(currentQuestion.figure);
+            figEl.classList.toggle('hidden', !currentQuestion.figure);
             document.getElementById('q-prompt').innerHTML = renderRich(currentQuestion.prompt || '');
 
             const container = document.getElementById('choices-container');
