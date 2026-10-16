@@ -34,6 +34,13 @@
         .frac { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; margin: 0 0.15em; line-height: 1.15; font-size: 0.95em; }
         .frac-n { border-bottom: 1.5px solid currentColor; padding: 0 0.3em; }
         .frac-d { padding: 0 0.3em; }
+        /* 回答振り返りのアコーディオン */
+        .review-card > summary::-webkit-details-marker { display: none; }
+        .review-card .review-close-label { display: none; }
+        .review-card[open] .review-open-label { display: none; }
+        .review-card[open] .review-close-label { display: inline; }
+        .review-card[open] .review-chevron i { transform: rotate(180deg); }
+        .review-card .review-chevron i { transition: transform 0.2s; }
         /* 図（魔方陣・三角形）: q.figure を core.js の renderFigure が描画 */
         .fig-grid { border-collapse: collapse; margin: 0 auto; }
         .fig-grid td { width: 2.8rem; height: 2.8rem; border: 2px solid #64748b; text-align: center; font-weight: 700; font-size: 1.05rem; }
@@ -130,6 +137,19 @@
                         <i class="fa-solid fa-chevron-right text-indigo-200 group-hover:translate-x-1 transition-transform"></i>
                     </button>
 
+                    <button onclick="startReviewMode()" class="w-full p-4 rounded-2xl bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 text-white font-bold transition flex items-center justify-between group shadow-lg shadow-rose-950/50">
+                        <div class="flex items-center space-x-3 text-left">
+                            <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm md:text-base font-bold">間違えた問題復習モード</h3>
+                                <p class="text-[11px] text-rose-100 font-normal">間違えた型を、別の数値でやり直す（<span id="mistake-count-badge">まだ間違えたパターンはありません</span>）</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-rose-100 group-hover:translate-x-1 transition-transform"></i>
+                    </button>
+
                     <button onclick="openCBTModal()" class="w-full p-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold transition flex items-center justify-between group shadow-lg shadow-emerald-950/50">
                         <div class="flex items-center space-x-3 text-left">
                             <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0">
@@ -218,9 +238,9 @@
                         全単元 混合
                     </span>
                 </div>
-                <button onclick="goToSelectScreen()" class="text-indigo-400 hover:text-indigo-300 font-bold flex items-center space-x-1">
+                <button id="config-change-btn" onclick="goToSelectScreen()" class="text-indigo-400 hover:text-indigo-300 font-bold flex items-center space-x-1">
                     <i class="fa-solid fa-pen-to-square text-[10px]"></i>
-                    <span>変更</span>
+                    <span id="config-change-label">変更</span>
                 </button>
             </div>
 
@@ -413,9 +433,16 @@
                     <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
             </div>
+            <div class="flex items-center justify-between mb-3 shrink-0">
+                <button id="review-filter-btn" onclick="toggleReviewWrongOnly()" class="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-slate-600 text-slate-300 transition">不正解だけ表示</button>
+            </div>
+            <p id="review-empty-note" class="hidden text-xs text-emerald-300 text-center py-6">不正解はありません。全問正解です！</p>
             <div class="overflow-y-auto space-y-4 flex-grow pr-1.5" id="session-review-list"></div>
             <div class="mt-4 pt-3 border-t border-slate-800/80 flex justify-between items-center shrink-0">
-                <span class="text-xs font-semibold text-slate-400" id="review-count-info">全 0 問</span>
+                <span class="flex items-center space-x-3">
+                    <span class="text-xs font-semibold text-slate-400" id="review-count-info">全 0 問</span>
+                    <button id="review-toggle-all" onclick="toggleAllReviewCards()" class="text-[11px] text-slate-400 hover:text-white underline">すべて開く</button>
+                </span>
                 <button onclick="closeReviewModal()" class="bg-[#5046e5] hover:bg-[#4338ca] text-white text-xs font-bold py-2.5 px-6 rounded-xl transition shadow-lg">
                     閉じる
                 </button>

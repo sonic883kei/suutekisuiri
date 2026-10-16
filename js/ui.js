@@ -19,6 +19,9 @@ const ALL_UNITS = UnitRegistry.list();
         let questionStartTime = 0;
 
         let isCBTMode = false;
+        let isReviewMode = false;          // 間違えた問題復習モード
+        let lastReviewKey = null;          // 直前に出した復習パターン（同じパターンが続かないように）
+        let reviewWrongOnly = false;       // 回答振り返りの「不正解だけ表示」
         let cbtSelectedUnits = [];
         let cbtTotalQuestions = 10;
         let cbtMaxOverallTime = 720; // 12分
@@ -49,6 +52,8 @@ const ALL_UNITS = UnitRegistry.list();
         function goToLanding() {
             if (cbtOverallTimerInterval) clearInterval(cbtOverallTimerInterval);
             isCBTMode = false;
+            isReviewMode = false;
+            updateMistakeBadges();
             hideAllViews();
             document.getElementById('view-landing').classList.remove('hidden');
             ['nav-review-btn', 'nav-stats-btn', 'nav-reset-btn', 'nav-history-btn'].forEach(id => {
@@ -60,6 +65,7 @@ const ALL_UNITS = UnitRegistry.list();
         function goToSelectScreen() {
             if (cbtOverallTimerInterval) clearInterval(cbtOverallTimerInterval);
             isCBTMode = false;
+            isReviewMode = false;
             hideAllViews();
             document.getElementById('view-select').classList.remove('hidden');
             ['nav-review-btn', 'nav-stats-btn', 'nav-reset-btn', 'nav-history-btn'].forEach(id => {
@@ -101,6 +107,8 @@ const ALL_UNITS = UnitRegistry.list();
         }
 
         function startPracticeWithConfig() {
+            isReviewMode = false;
+            setConfigChangeButton(false);
             hideAllViews();
             document.getElementById('view-practice').classList.remove('hidden');
             document.getElementById('nav-change-config-btn').classList.remove('hidden');
@@ -117,8 +125,17 @@ const ALL_UNITS = UnitRegistry.list();
             isAnswered = false;
             document.getElementById('explanation-card').classList.add('hidden');
 
-            let targetUnit = configUnit;
-            if (isCBTMode) {
+            let targetUnit = configUnit, reviewTarget = null;
+            if (isReviewMode) {
+                reviewTarget = pickReviewTarget();
+                if (!reviewTarget) {          // 復習リストが空になった
+                    alert('復習するパターンがなくなりました。お疲れさまでした！');
+                    goToLanding();
+                    return;
+                }
+                targetUnit = reviewTarget.u;
+                document.getElementById('active-config-badge').textContent = `間違えた問題復習（残り ${Object.keys(loadMistakes()).length} パターン）`;
+            } else if (isCBTMode) {
                 if (cbtQuestionIndex >= cbtTotalQuestions) {
                     finishCBTMode();
                     return;
@@ -132,6 +149,10 @@ const ALL_UNITS = UnitRegistry.list();
 
             // 固定問題JSON(fixed指定の単元で読み込めた場合)があればそれ、無ければ数値ランダム生成
             currentQuestion = generateQuestion(targetUnit);
+            if (reviewTarget) {               // 間違えたのと同じパターン（title が同じ）を、別の数値で出題する
+                for (let i = 0; i < 400 && currentQuestion.title !== reviewTarget.title; i++) currentQuestion = generateQuestion(targetUnit);
+            }
+            currentQuestion.unitId = targetUnit;
             const sourceBadgeText = FixedPools[targetUnit] ? '固定問題JSON' : '数値ランダム生成';
 
             currentQuestion.choices = generateChoices(currentQuestion);
@@ -173,6 +194,7 @@ const ALL_UNITS = UnitRegistry.list();
             if (isCorrect) correctCount++;
 
             saveUnitStat(currentQuestion.unit, isCorrect, timeSpent);
+            const mistakeNote = recordMistakeResult(currentQuestion, isCorrect);
 
             sessionAnswers.push({
                 question: currentQuestion,
@@ -195,7 +217,7 @@ const ALL_UNITS = UnitRegistry.list();
                     </div>
                     <div>
                         <h4 class="font-bold text-sm">正解！</h4>
-                        <p class="text-xs text-emerald-300/80">解答にかかった時間: ${timeSpent}秒</p>
+                        <p class="text-xs text-emerald-300/80">解答にかかった時間: ${timeSpent}秒${mistakeNote ? '　' + mistakeNote : ''}</p>
                     </div>
                 `;
             } else {
@@ -206,7 +228,7 @@ const ALL_UNITS = UnitRegistry.list();
                     </div>
                     <div>
                         <h4 class="font-bold text-sm">不正解...</h4>
-                        <p class="text-xs text-rose-300/80">解答にかかった時間: ${timeSpent}秒</p>
+                        <p class="text-xs text-rose-300/80">解答にかかった時間: ${timeSpent}秒${mistakeNote ? '　' + mistakeNote : ''}</p>
                     </div>
                 `;
             }
@@ -281,6 +303,7 @@ const ALL_UNITS = UnitRegistry.list();
             closeCBTModal();
 
             isCBTMode = true;
+            isReviewMode = false;
             cbtQuestionIndex = 0;
             totalCount = 0;
             correctCount = 0;
@@ -391,6 +414,74 @@ const ALL_UNITS = UnitRegistry.list();
             }
         }
 
+
+        // ----------------------------------------------------
+        // 間違えた問題の記録と、復習モード
+        //   記録の単位は「単元＋パターン(title)」。数値は毎回変わるので、同じ型を別の数値でやり直す。
+        //   間違えると記録（新規は n＝2）。復習モードで正解するたびに n が 1 減り、0 になると「卒業」。
+        //   復習中にまた間違えると n が増える（最大 4）。
+        // ----------------------------------------------------
+        const MISTAKE_KEY = 'komuin_mistakes_v1';
+        function loadMistakes() {
+            try { const d = localStorage.getItem(MISTAKE_KEY); return d ? JSON.parse(d) : {}; } catch (e) { return {}; }
+        }
+        function saveMistakes(m) {
+            try { localStorage.setItem(MISTAKE_KEY, JSON.stringify(m)); } catch (e) {}
+        }
+        // 解答結果を記録。復習モードのときは、卒業や回数のメッセージを返す
+        function recordMistakeResult(q, isCorrect) {
+            if (!q || !q.unitId || !q.title) return '';
+            const m = loadMistakes(), key = q.unitId + '|' + q.title;
+            let note = '';
+            if (!isCorrect) {
+                const e = m[key] || { u: q.unitId, unit: q.unit, title: q.title, n: 1 };
+                e.n = Math.min((m[key] ? e.n : 1) + 1, 4); e.last = Date.now();
+                m[key] = e;
+                if (isReviewMode) note = `（このパターンは、あと ${e.n} 回正解で卒業）`;
+            } else if (isReviewMode && m[key]) {
+                m[key].n -= 1;
+                if (m[key].n <= 0) { delete m[key]; note = '🎓 このパターンは卒業！復習リストから外れました'; }
+                else note = `（このパターンは、あと ${m[key].n} 回正解で卒業）`;
+            }
+            saveMistakes(m);
+            return note;
+        }
+        // 復習するパターンを n が大きいほど出やすく選ぶ（直前と同じパターンは避ける）
+        function pickReviewTarget() {
+            const list = Object.entries(loadMistakes()).map(([k, v]) => ({ key: k, ...v }));
+            if (list.length === 0) return null;
+            const cand = list.length > 1 ? list.filter(e => e.key !== lastReviewKey) : list;
+            const total = cand.reduce((a, e) => a + e.n, 0);
+            let r = getRand() * total, pick = cand[cand.length - 1];
+            for (const e of cand) { r -= e.n; if (r < 0) { pick = e; break; } }
+            lastReviewKey = pick.key;
+            return pick;
+        }
+        function updateMistakeBadges() {
+            const n = Object.keys(loadMistakes()).length, el = document.getElementById('mistake-count-badge');
+            if (el) el.textContent = n > 0 ? `復習待ち ${n} パターン` : 'まだ間違えたパターンはありません';
+        }
+        function setConfigChangeButton(forReview) {   // 練習画面上部の「変更」ボタン（復習モードでは「メニューへ」）
+            const btn = document.getElementById('config-change-btn'), label = document.getElementById('config-change-label');
+            if (!btn || !label) return;
+            btn.onclick = forReview ? goToLanding : goToSelectScreen;
+            label.textContent = forReview ? 'メニューへ' : '変更';
+        }
+        function startReviewMode() {
+            if (Object.keys(loadMistakes()).length === 0) {
+                alert('復習する問題はまだありません。通常演習やCBTで間違えたパターンが、ここに溜まります。');
+                return;
+            }
+            isReviewMode = true;
+            isCBTMode = false;
+            lastReviewKey = null;
+            hideAllViews();
+            document.getElementById('view-practice').classList.remove('hidden');
+            setConfigChangeButton(true);
+            sessionAnswers = [];
+            generateNewQuestion();
+        }
+
         // --- データ保存・分析ロジック ---
         function loadUnitStats() {
             try {
@@ -472,28 +563,84 @@ const ALL_UNITS = UnitRegistry.list();
 
             if (sessionAnswers.length === 0) {
                 container.innerHTML = '<p class="text-xs text-slate-400 text-center py-8">回答履歴はまだありません。</p>';
-                if (info) info.innerText = '全 0 問';
+                if (info) info.textContent = '全 0 問';
             } else {
-                if (info) info.innerText = `全 ${sessionAnswers.length} 問`;
+                if (info) info.textContent = `全 ${sessionAnswers.length} 問`;
                 sessionAnswers.forEach((ans, idx) => {
-                    const card = document.createElement('div');
-                    card.className = `p-3.5 rounded-2xl border text-xs ${ans.isCorrect ? 'bg-emerald-950/30 border-emerald-800/40' : 'bg-rose-950/30 border-rose-800/40'}`;
+                    const q = ans.question, ok = ans.isCorrect;
+                    const card = document.createElement('details');      // アコーディオン（開くと問題文・選択肢・解説）
+                    card.dataset.ok = ok ? '1' : '0';
+                    card.className = `review-card rounded-2xl border text-xs ${ok ? 'bg-emerald-950/30 border-emerald-800/40' : 'bg-rose-950/30 border-rose-800/40'}`;
 
-                    const correctChoice = (ans.question.choices || []).find(c => c.isCorrect);
+                    const correctChoice = (q.choices || []).find(c => c.isCorrect);
                     const correctText = correctChoice ? renderFractions(correctChoice.htmlText) : '';
+                    const choiceRows = (q.choices || []).map(c => {
+                        const picked = ans.selected && ans.selected.label === c.label;
+                        const cls = c.isCorrect ? 'border-emerald-500/60 bg-emerald-900/30 text-emerald-200' : (picked ? 'border-rose-500/60 bg-rose-900/30 text-rose-200' : 'border-slate-700 text-slate-400');
+                        return `<div class="px-2.5 py-1.5 rounded-lg border ${cls}">${renderFractions(c.htmlText)}${c.isCorrect ? ' <span class="font-bold">← 正答</span>' : (picked ? ' <span class="font-bold">← あなたの選択</span>' : '')}</div>`;
+                    }).join('');
+                    const steps = (q.steps || []).map((st, i) => `<p class="mb-1.5"><span class="text-indigo-300 font-bold mr-1">${i + 1}.</span>${renderFractions(st)}</p>`).join('');
 
                     card.innerHTML = `
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="font-bold text-slate-200">問 ${idx + 1} (${ans.question.unit})</span>
-                            <span class="font-bold ${ans.isCorrect ? 'text-emerald-400' : 'text-rose-400'}">${ans.isCorrect ? '正解' : '不正解'} (${ans.timeSpent}秒)</span>
+                        <summary class="p-3.5 cursor-pointer select-none list-none">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-bold text-slate-200">問 ${idx + 1} (${q.unit}${q.title ? '／' + q.title : ''})</span>
+                                <span class="font-bold ${ok ? 'text-emerald-400' : 'text-rose-400'}">${ok ? '正解' : '不正解'} (${ans.timeSpent}秒)</span>
+                            </div>
+                            <p class="text-slate-300 mb-2 leading-relaxed font-medium">${renderRich(q.prompt)}</p>
+                            <div class="flex justify-between items-end">
+                                <p class="text-slate-400 text-[11px]">選択: <span class="text-white font-bold">${ans.selected ? renderFractions(ans.selected.htmlText) : '未選択'}</span> / 正答: <span class="text-emerald-300 font-bold">${correctText}</span></p>
+                                <span class="review-chevron text-indigo-300 text-[11px] font-bold whitespace-nowrap ml-2"><span class="review-open-label">解説を見る</span><span class="review-close-label">閉じる</span> <i class="fa-solid fa-chevron-down text-[10px]"></i></span>
+                            </div>
+                        </summary>
+                        <div class="px-3.5 pb-3.5 pt-1 border-t border-slate-700/50 space-y-3">
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-500 mb-1">問題</p>
+                                <p class="text-slate-200 leading-relaxed whitespace-pre-line">${renderRich(q.text || '')}</p>
+                                ${q.figure ? `<div class="my-2 overflow-x-auto">${renderFigure(q.figure)}</div>` : ''}
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">${choiceRows}</div>
+                            <div class="bg-[#1c243c] border-l-4 border-indigo-500 rounded-r-xl p-3 text-slate-200 leading-relaxed">
+                                <p class="text-[10px] font-bold text-indigo-300 mb-1.5">解説</p>
+                                ${steps}
+                            </div>
                         </div>
-                        <p class="text-slate-300 mb-2 leading-relaxed font-medium">${renderRich(ans.question.prompt)}</p>
-                        <p class="text-slate-400 text-[11px]">選択: <span class="text-white font-bold">${ans.selected ? renderFractions(ans.selected.htmlText) : '未選択'}</span> / 正答: <span class="text-emerald-300 font-bold">${correctText}</span></p>
                     `;
                     container.appendChild(card);
                 });
             }
+            const tb = document.getElementById('review-toggle-all'); if (tb) tb.textContent = 'すべて開く';
+            reviewWrongOnly = false;
+            if (sessionAnswers.length > 0) applyReviewFilter();
             document.getElementById('review-modal').classList.remove('hidden');
+        }
+
+        function applyReviewFilter() {      // 「不正解だけ表示」の反映
+            const cards = [...document.querySelectorAll('#session-review-list details')];
+            cards.forEach(c => c.classList.toggle('hidden', reviewWrongOnly && c.dataset.ok === '1'));
+            const wrong = cards.filter(c => c.dataset.ok === '0').length;
+            const btn = document.getElementById('review-filter-btn');
+            if (btn) {
+                btn.innerHTML = reviewWrongOnly ? '<i class="fa-solid fa-filter-circle-xmark mr-1"></i>すべて表示に戻す' : `<i class="fa-solid fa-filter mr-1"></i>不正解だけ表示（${wrong}）`;
+                btn.className = 'text-[11px] font-bold px-3 py-1.5 rounded-lg border transition ' + (reviewWrongOnly ? 'bg-rose-900/40 border-rose-600 text-rose-200' : 'border-slate-600 text-slate-300 hover:border-rose-500 hover:text-rose-300');
+            }
+            const info = document.getElementById('review-count-info');
+            if (info) info.textContent = reviewWrongOnly ? `不正解 ${wrong} 問 / 全 ${cards.length} 問` : `全 ${cards.length} 問（不正解 ${wrong}）`;
+            const empty = document.getElementById('review-empty-note');
+            if (empty) empty.classList.toggle('hidden', !(reviewWrongOnly && wrong === 0));
+        }
+
+        function toggleReviewWrongOnly() {
+            reviewWrongOnly = !reviewWrongOnly;
+            applyReviewFilter();
+        }
+
+        function toggleAllReviewCards() {   // すべて開く／すべて閉じる
+            const cards = [...document.querySelectorAll('#session-review-list details')].filter(c => !c.classList.contains('hidden'));
+            const open = cards.some(c => !c.open);
+            cards.forEach(c => c.open = open);
+            const btn = document.getElementById('review-toggle-all');
+            if (btn) btn.textContent = open ? 'すべて閉じる' : 'すべて開く';
         }
 
         function closeReviewModal() {
@@ -551,6 +698,8 @@ const ALL_UNITS = UnitRegistry.list();
                 globalHistory = [];
                 localStorage.removeItem('komuin_cbt_history');
                 localStorage.removeItem('komuin_unit_stats_v1');
+                localStorage.removeItem(MISTAKE_KEY);
+                updateMistakeBadges();
                 alert('データをクリアしました。');
             }
         }
@@ -558,6 +707,7 @@ const ALL_UNITS = UnitRegistry.list();
 
         window.addEventListener('DOMContentLoaded', () => {
             renderUnitSelectionGrid();
+            updateMistakeBadges();
             cbtSelectedUnits = ALL_UNITS.slice(0, 10).map(u => u.id);
             loadFixedPools();   // fixed を指定した単元がある場合のみ固定問題JSONを取得
         });
