@@ -8,7 +8,7 @@
  */
 
 const ALL_UNITS = UnitRegistry.list();
-const APP_BUILD = '20261116a';   // index.html の data-build と同じ値にする（食い違うと画面に警告）
+const APP_BUILD = '20261117a';   // index.html の data-build と同じ値にする（食い違うと画面に警告）
 
         let configUnit = 'all';
 

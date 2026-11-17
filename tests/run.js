@@ -1135,6 +1135,128 @@ function checkU24(q, choices) {
     return false;
 }
 
+// ㉕ 円: 図の座標から円・接線・角度・長さを実測して答えを照合する
+function checkU25(q, choices) {
+    const G = R.Geom, num = Number, t = q.text, strip = c => c.htmlText.replace(/^.\s*/, '');
+    const near = (a, b, e = 1e-6) => Math.abs(a - b) < e;
+    const len = (a, b) => G.len(G.sub(a, b)), ang = (v, a, b) => G.angle(v, a, b), dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+    const par = (a, b, c, d) => Math.abs(G.cross(G.sub(b, a), G.sub(d, c))) < 1e-6 * len(a, b) * len(c, d);
+    const col = (a, b, c) => Math.abs(G.cross(G.sub(b, a), G.sub(c, a))) < 1e-6 * (1 + len(a, b) * len(a, c));
+    const side = (a, b, p) => Math.sign(G.cross(G.sub(b, a), G.sub(p, a)));
+    const items = (q.figure && q.figure.items) || [], P = {}; items.filter(i => i.k === 'lab').forEach(l => P[l.s] = l.p);
+    const has = ks => ks.split('').every(k => P[k]);
+    const gcd = (a, b) => b ? gcd(b, a % b) : a;
+    const oneOk = choices.length === 5 && choices.filter(c => c.isCorrect).length === 1 && new Set(choices.map(c => c.value)).size === 5 && choices.every(c => c.value > 0) && choices.some(c => c.isCorrect && c.value === q.correctAnswer);
+    const consec = () => choices.map(c => c.value).sort((a, b) => a - b).every((v, i, a) => i === 0 || near(v - a[i - 1], a[1] - a[0], 1e-9));
+    const circ = tag => items.find(i => i.k === 'circ' && i.tag === tag);
+    const on = (p, c) => near(len(p, c.c), c.r, 1e-6);
+    const angOf = name => ang(P[name[1]], P[name[0]], P[name[2]]);            // ∠XYZ ＝ 頂点 Y
+    const surdVal = s => { const m = s.match(/^(\d*)√(\d+)$/); return m ? (m[1] ? num(m[1]) : 1) * Math.sqrt(num(m[2])) : num(s); };
+    let m;
+    if (q.title === '円周角・対角の和') {
+        const c = circ('circle'); if (!c || !has('ABCDEF')) return false;
+        if (!'ABCDE'.split('').every(k => on(P[k], c))) return false;
+        const poly = items.find(i => i.k === 'poly'); if (!poly || poly.pts.length !== 4) return false;
+        const sg = [0, 1, 2, 3].map(i => Math.sign(G.cross(G.sub(poly.pts[(i + 1) % 4], poly.pts[i]), G.sub(poly.pts[(i + 2) % 4], poly.pts[(i + 1) % 4]))));
+        const ok = sg.every(v => v === sg[0]) && par(P.A, P.D, P.B, P.C) && near(len(P.A, P.B), len(P.C, P.D)) && near(ang(P.A, P.B, P.E), ang(P.A, P.E, P.D)) && near(ang(P.A, P.B, P.E) + ang(P.A, P.E, P.D), ang(P.A, P.B, P.D))
+            && col(P.D, P.C, P.F) && dot(G.sub(P.C, P.D), G.sub(P.F, P.C)) > 0 && side(P.D, P.C, P.E) === side(P.D, P.C, P.A) && side(P.B, P.C, P.E) !== side(P.B, P.C, P.D);
+        const mA = t.match(/∠ABC が (\d+)° のとき、∠ECF/), mB = t.match(/∠ECF が (\d+)° のとき、∠ABC/); if (!!mA === !!mB) return false;
+        const given = num((mA || mB)[1]), gm = mA ? angOf('ABC') : angOf('ECF'), ans = mA ? angOf('ECF') : angOf('ABC');
+        const gi = items.find(i => i.k === 'ang' && i.tag === 'given');
+        return ok && near(gm, given) && near(ans, q.correctAnswer) && (mA ? !gi : gi && gi.s === given + '°') && oneOk && consec() && choices.every(c => /^.\s\d+°$/.test(c.htmlText));
+    }
+    if (q.title === '接弦定理') {
+        const c = circ('circle'); if (!c || !has('PABC')) return false;
+        const ok = ['A', 'B', 'C'].every(k => on(P[k], c)) && len(P.P, c.c) > c.r + 1e-6 && near(dot(G.sub(P.A, c.c), G.sub(P.A, P.P)), 0) && near(dot(G.sub(P.B, c.c), G.sub(P.B, P.P)), 0);
+        const arcs = items.filter(i => i.k === 'ang'), given = arcs.filter(i => i.tag === 'given'), asked = arcs.filter(i => i.tag === 'x');
+        if (asked.length !== 1 || !given.length) return false;
+        if (!given.every(g => g.s === Math.round(ang(g.v, g.a, g.b)) + '°' && near(ang(g.v, g.a, g.b), Math.round(ang(g.v, g.a, g.b))))) return false;
+        const meas = ang(asked[0].v, asked[0].a, asked[0].b), kd = t.match(/∠(APB|CAB|ACB) の大きさとして/); if (!kd) return false;
+        const nameOf = it => ['P', 'A', 'B', 'C'].find(k => near(len(P[k], it.v), 0));
+        const gv = {}; given.forEach(g => gv[nameOf(g)] = ang(g.v, g.a, g.b));
+        let exp;
+        if (kd[1] === 'APB') { if (gv.A === undefined || gv.B === undefined) return false; exp = 2 * (gv.A + gv.B) - 180; }
+        else if (kd[1] === 'CAB') { if (gv.B === undefined || gv.P === undefined) return false; exp = 180 - (180 - gv.P) / 2 - gv.B; }
+        else { if (gv.P === undefined) return false; exp = 90 - gv.P / 2; }
+        return ok && ang(P.C, P.A, P.B) < 90 && near(meas, exp) && near(meas, q.correctAnswer) && nameOf(asked[0]) === { APB: 'P', CAB: 'A', ACB: 'C' }[kd[1]] && oneOk && consec() && choices.every(c => /^.\s\d+°$/.test(c.htmlText));
+    }
+    if (q.title === '内接円') {
+        const poly = items.find(i => i.k === 'poly'), rt = items.find(i => i.k === 'rt'), txts = items.filter(i => i.k === 'txt'); if (!poly || poly.pts.length !== 3 || !rt) return false;
+        const V = poly.pts, sideLen = [len(V[0], V[1]), len(V[1], V[2]), len(V[2], V[0])];
+        if (!sideLen.every(x => near(x, Math.round(x), 1e-6))) return false;
+        if (!near(dot(G.sub(V[1], rt.v), G.sub(V[2], rt.v)) * 0 + dot(G.sub(rt.a, rt.v), G.sub(rt.b, rt.v)), 0)) return false;
+        if (txts.length < 2 || txts.length > 3) return false;
+        for (const x of txts) {
+            const val = num(x.s.replace('cm', '')), mids = [0, 1, 2].map(i => G.lerp(V[i], V[(i + 1) % 3], 0.5)), k = [0, 1, 2].reduce((b, i) => len(mids[i], x.p) < len(mids[b], x.p) ? i : b, 0);
+            if (!near(val, sideLen[k])) return false;
+        }
+        const Area = Math.abs(G.cross(G.sub(V[1], V[0]), G.sub(V[2], V[0]))) / 2, r = 2 * Area / (sideLen[0] + sideLen[1] + sideLen[2]);
+        const vals = choices.map(c => num(strip(c).replace('cm', '')));
+        return near(r, q.correctAnswer) && oneOk && choices.every((c, i) => /^.\s\d+\.\dcm$/.test(c.htmlText) && near(vals[i], c.value, 1e-9) && c.isCorrect === near(c.value, r, 1e-9)) && vals.every((v, i) => i === 0 || v > vals[i - 1]);
+    }
+    if (q.title === '円と接線①') {
+        const cp = circ('P'), cq = circ('Q'), ln = items.find(i => i.k === 'seg' && i.tag === 'line'); if (!cp || !cq || !ln || !has('PQAB')) return false;
+        const mr = t.match(/半径 (\d+)(?:cm)? の円 P と半径 (\d+)(?:cm)? の円 Q/); if (!mr || num(mr[1]) !== cp.r || num(mr[2]) !== cq.r) return false;
+        const y0 = ln.a[1]; if (!near(ln.a[1], ln.b[1])) return false;
+        const touch = /接している/.test(t), ext = /同じ側/.test(t), intl = /間を通る/.test(t); if (touch + ext + intl !== 1) return false;
+        const sP = Math.sign(cp.c[1] - y0), sQ = Math.sign(cq.c[1] - y0);
+        const ok = near(Math.abs(cp.c[1] - y0), cp.r) && near(Math.abs(cq.c[1] - y0), cq.r) && near(len(P.A, cp.c), cp.r) && near(len(P.B, cq.c), cq.r) && near(P.A[1], y0) && near(P.B[1], y0) && (intl ? sP !== sQ : sP === sQ);
+        const AB = len(P.A, P.B), d = len(cp.c, cq.c);
+        if (touch && !near(d, cp.r + cq.r)) return false;
+        if (!touch) { const md = t.match(/中心間の距離は (\d+)cm/); if (!md || !near(d, num(md[1]))); if (!md || !near(d, num(md[1]))) return false; if (!(d > cp.r + cq.r)) return false; }
+        if (!(ok && near(AB, q.correctAnswer))) return false;
+        if (touch) {
+            const fs = choices.map(c => strip(c)); if (!fs.every(x => /^(\d*)√(\d+)$|^\d+$/.test(x))) return false;
+            const vals = fs.map(surdVal), key = fs.map(x => { const mm = x.match(/^(\d*)√(\d+)$/); return mm ? [mm[1] ? num(mm[1]) : 1, num(mm[2])] : [num(x), 1]; });
+            return oneOk && vals.every((v, i) => near(v, choices[i].value, 1e-9) && choices[i].isCorrect === near(v, AB, 1e-9)) && key.every((k, i) => i === 0 || k[0] > key[i - 1][0] || (k[0] === key[i - 1][0] && k[1] > key[i - 1][1]));
+        }
+        return oneOk && consec() && choices.every(c => /^\d+cm$/.test(strip(c)));
+    }
+    if (q.title === '円周角') {
+        const c = circ('circle'); const mn = t.match(/円周を (\d+) 等分する点 A〜(\w) がある/); if (!c || !mn) return false;
+        const n = num(mn[1]); if (mn[2] !== String.fromCharCode(64 + n)) return false;
+        const pa = [...Array(n).keys()].map(i => { const p = P[String.fromCharCode(65 + i)]; return p ? Math.atan2(p[1] - c.c[1], p[0] - c.c[0]) * 180 / Math.PI : NaN; });
+        if (pa.some(x => !Number.isFinite(x))) return false;
+        const step = ((pa[1] - pa[0]) % 360 + 360) % 360, dir = near(step, 360 / n, 1e-6) ? 1 : near(step, 360 - 360 / n, 1e-6) ? -1 : 0; if (!dir) return false;
+        for (let i = 0; i < n; i++) { if (!near(len(P[String.fromCharCode(65 + i)], c.c), c.r)) return false; const dd = (((pa[(i + 1) % n] - pa[i]) * dir) % 360 + 360) % 360; if (!near(dd, 360 / n, 1e-6)) return false; }
+        let ans;
+        if ((m = t.match(/弦 (\w\w) と弦 (\w\w) の交点を (\w) とするとき、∠(\w)(\w)(\w) の大きさ/))) {
+            const [c1, c2, iN, u, mid, w] = [m[1], m[2], m[3], m[4], m[5], m[6]]; if (mid !== iN || !P[iN] || (n <= 8) !== (iN === 'I') || (n > 8 && iN !== 'P')) return false;
+            const Ii = tpInterCheck(P[c1[0]], P[c1[1]], P[c2[0]], P[c2[1]]); if (!near(len(Ii, P[iN]), 0, 1e-6)) return false;
+            if (!(c1.includes(u) && c2.includes(w)) && !(c2.includes(u) && c1.includes(w))) return false;
+            if (!G.onSeg(P[iN], P[c1[0]], P[c1[1]]) || !G.onSeg(P[iN], P[c2[0]], P[c2[1]])) return false;      // 弦が円の内側で交わる
+            ans = ang(P[iN], P[u], P[w]);
+        } else if ((m = t.match(/∠(\w)(\w)(\w) の大きさはいくつか/))) ans = ang(P[m[2]], P[m[1]], P[m[3]]);
+        else return false;
+        const ax = items.find(i => i.k === 'ang' && i.tag === 'x'); if (!ax || !near(ang(ax.v, ax.a, ax.b), ans)) return false;
+        return near(ans, q.correctAnswer, 1e-6) && oneOk && consec() && choices.every(c => /^.\s\d+(\.\d)?°$/.test(c.htmlText) && c.value < 180);
+    }
+    if (q.title === '内心') {
+        const poly = items.find(i => i.k === 'poly'); if (!poly || !has('ABCI')) return false;
+        const dl = (p, a, b) => Math.abs(G.cross(G.sub(b, a), G.sub(p, a))) / len(a, b), d1 = dl(P.I, P.B, P.C), d2 = dl(P.I, P.C, P.A), d3 = dl(P.I, P.A, P.B);
+        const inside = side(P.A, P.B, P.I) === side(P.A, P.B, P.C) && side(P.B, P.C, P.I) === side(P.B, P.C, P.A) && side(P.C, P.A, P.I) === side(P.C, P.A, P.B);
+        if (!(near(d1, d2) && near(d2, d3) && inside)) return false;
+        let given, ans;
+        if ((m = t.match(/∠(\w)I(\w)＝(\d+)° のとき、∠(\w\w\w) は何度か/))) { given = [angOf(m[1] + 'I' + m[2]), num(m[3])]; ans = angOf(m[4]); if (![m[1], m[2]].every(x => 'ABC'.includes(x))) return false; }
+        else if ((m = t.match(/∠(\w\w\w)＝(\d+)° のとき、∠(\w)I(\w) は何度か/))) { given = [angOf(m[1]), num(m[2])]; ans = angOf(m[3] + 'I' + m[4]); }
+        else return false;
+        const segs = items.filter(i => i.k === 'seg').length;
+        return segs === 2 && near(given[0], given[1]) && near(ans, q.correctAnswer) && oneOk && choices.every((c, i, a) => /^.\s\d+°$/.test(c.htmlText) && (i === 0 || c.value > a[i - 1].value) && c.value < 180);
+    }
+    if (q.title === '円と接線②') {
+        const cA = circ('A'), cB = circ('B'), cC = circ('C'), l = items.find(i => i.tag === 'l'), mm = items.find(i => i.tag === 'm'), nn = items.find(i => i.tag === 'n');
+        const mr = t.match(/A の半径は (\d+)cm、B の半径は (\d+)cm、C の半径は (\d+)cm/); if (!cA || !cB || !cC || !l || !mm || !nn || !mr) return false;
+        if (![cA.r, cB.r, cC.r].every((r, i) => r === num(mr[i + 1]))) return false;
+        const y0 = l.a[1], ok = [cA, cB, cC].every(c => near(c.c[1] - y0, c.r)) && near(len(cA.c, cB.c), cA.r + cB.r) && near(len(cB.c, cC.c), cB.r + cC.r) && len(cA.c, cC.c) >= cA.r + cC.r - 1e-9
+            && near(cA.c[0] - mm.a[0], cA.r) && near(nn.a[0] - cC.c[0], cC.r) && near(mm.a[0], mm.b[0]) && near(nn.a[0], nn.b[0]) && near(l.a[1], l.b[1]);
+        const X = nn.a[0] - mm.a[0], K = cA.r + cC.r, fs = choices.map(c => strip(c).replace(/ cm$/, ''));
+        const key = [], vals = fs.map(x => { const q2 = x.match(/^(\d+) \+ (\d*)√(\d+)$/); if (!q2 || num(q2[1]) !== K) return NaN; key.push([q2[2] ? num(q2[2]) : 1, num(q2[3])]); return K + (q2[2] ? num(q2[2]) : 1) * Math.sqrt(num(q2[3])); });
+        return ok && near(X, q.correctAnswer) && oneOk && vals.every((v, i) => near(v, choices[i].value, 1e-9) && choices[i].isCorrect === near(v, X, 1e-9)) && key.every((k, i) => i === 0 || k[0] > key[i - 1][0] || (k[0] === key[i - 1][0] && k[1] < key[i - 1][1]));
+    }
+    return false;
+}
+function tpInterCheck(p1, p2, p3, p4) { const G = R.Geom, d1 = G.sub(p2, p1), d2 = G.sub(p4, p3), tt = G.cross(G.sub(p3, p1), d2) / G.cross(d1, d2); return G.add(p1, G.mul(d1, tt)); }
+
 console.log(`単元数: ${R.UnitRegistry.list().length} / 各単元 ${N} 回生成\n`);
 for (const u of R.UnitRegistry.list()) {
     if (process.env.ONLY && !process.env.ONLY.split(',').includes(u.id)) continue;
@@ -1156,6 +1278,7 @@ for (const u of R.UnitRegistry.list()) {
         if (ch.length !== 5 || ch.filter(c => c.isCorrect).length !== 1) note('選択肢が5個/正解1つでない', q.title);
         seen.add(q.text + q.prompt);
         if (u.id === 'u10' && !checkU10(q, ch)) note('u10: 別解法と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
+        if (u.id === 'u25' && !checkU25(q, ch)) note('u25: 図の実測と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u24' && !checkU24(q, ch)) note('u24: 図の実測・列挙と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u23' && !checkU23(q, ch)) note('u23: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u22' && !checkU22(q, ch)) note('u22: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
