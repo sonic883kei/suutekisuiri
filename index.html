@@ -53,6 +53,15 @@
         .fig-calc td.fig-given0 { color: #e2e8f0; }
         .fig-calc td.fig-unk { color: #fde68a; background: rgba(250, 204, 21, 0.18); border-radius: 0.3rem; }
         .fig-calc tr.fig-rule td { border-bottom: 2px solid #94a3b8; }
+        .fig-geom { width: 100%; max-width: 20rem; height: auto; display: block; margin: 0 auto; }
+        .fig-geom .g-line { stroke: #94a3b8; stroke-width: 1.8; fill: none; stroke-linejoin: round; }
+        .fig-geom .g-dash { stroke-dasharray: 5 4; }
+        .fig-geom .g-tick { stroke-width: 1.5; }
+        .fig-geom .g-arc { stroke: #fbbf24; stroke-width: 1.6; fill: none; }
+        .fig-geom .g-dotc { fill: #94a3b8; }
+        .fig-geom .g-txt { fill: #cbd5e1; font-size: 12px; font-weight: 600; }
+        .fig-geom .g-lab { fill: #e2e8f0; font-size: 14px; font-weight: 700; }
+        .fig-geom .g-ang { fill: #fde68a; font-size: 12px; font-weight: 700; }
         .fig-svg { width: 15rem; max-width: 100%; height: auto; display: block; margin: 0 auto; }
         .fig-line { stroke: #94a3b8; stroke-width: 2.5; }
         .fig-dot { fill: #1b233a; stroke: #94a3b8; stroke-width: 2.5; }
@@ -71,7 +80,7 @@
         }
     </style>
 </head>
-<body class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col justify-between">
+<body data-build="20261116a" class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col justify-between">
 
     <header class="bg-[#111827]/90 backdrop-blur-md text-white border-b border-slate-800/80 sticky top-0 z-40">
         <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
@@ -120,7 +129,7 @@
                 </div>
                 <h1 class="text-2xl font-extrabold text-white mb-2">高卒公務員試験 数的推理</h1>
                 <p class="text-xs md:text-sm text-slate-400 mb-8 leading-relaxed">
-                    全23単元対応・数値ランダム演習＆本番形式CBT模擬試験
+                    全<span id="unit-count-text">24</span>単元対応・数値ランダム演習＆本番形式CBT模擬試験
                 </p>
 
                 <div class="space-y-4">
@@ -144,7 +153,7 @@
                             </div>
                             <div>
                                 <h3 class="text-sm md:text-base font-bold">間違えた問題復習モード</h3>
-                                <p class="text-[11px] text-rose-100 font-normal">間違えた型を、別の数値でやり直す（<span id="mistake-count-badge">まだ間違えた問題はありません</span>）</p>
+                                <p class="text-[11px] text-rose-100 font-normal">間違えた型を、別の数値でやり直す（<span id="mistake-count-badge">まだ間違えたパターンはありません</span>）</p>
                             </div>
                         </div>
                         <i class="fa-solid fa-chevron-right text-rose-100 group-hover:translate-x-1 transition-transform"></i>
@@ -164,6 +173,7 @@
                     </button>
                 </div>
             </div>
+            <p id="app-build" class="text-center text-[10px] text-amber-400 mt-3">⚠ ui.js が新しい版に更新されていません。Ctrl＋F5（スマホは再読み込み）をお試しください</p>
         </section>
 
         <!-- 2. UNIT SELECT VIEW -->
@@ -478,31 +488,44 @@
         <p>高卒公務員試験 数的推理演習システム</p>
     </footer>
 
+    <!-- 読み込みエラーの表示（原因調べ用）。エラーが起きたら画面下に出す -->
+    <script>
+        window.addEventListener('error', function (e) {
+            try {
+                var d = document.getElementById('err-banner');
+                if (!d) { d = document.createElement('div'); d.id = 'err-banner'; d.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:#7f1d1d;color:#fff;font-size:11px;padding:8px 10px;border-radius:10px;white-space:pre-wrap;word-break:break-all'; document.body.appendChild(d); }
+                d.textContent += '⚠ エラー: ' + (e.message || '読み込み失敗') + ' (' + String(e.filename || (e.target && (e.target.src || e.target.href)) || '').split('/').slice(-2).join('/') + ':' + (e.lineno || '') + ')\n';
+            } catch (_) {}
+        }, true);
+    </script>
     <!-- 読み込み順: core.js → 各単元 → ui.js （通常の<script>なので file:// でも動作） -->
-    <script src="js/core.js"></script>
-    <script src="js/units/u01_concentration.js"></script>
-    <script src="js/units/u02_age.js"></script>
-    <script src="js/units/u03_profit.js"></script>
-    <script src="js/units/u04_average.js"></script>
-    <script src="js/units/u05_equation1.js"></script>
-    <script src="js/units/u06_simultaneous.js"></script>
-    <script src="js/units/u07_indefinite.js"></script>
-    <script src="js/units/u08_traveler.js"></script>
-    <script src="js/units/u09_train.js"></script>
-    <script src="js/units/u10_river.js"></script>
-    <script src="js/units/u11_clock.js"></script>
-    <script src="js/units/u12_speed_other.js"></script>
-    <script src="js/units/u13_inequality.js"></script>
-    <script src="js/units/u14_work.js"></script>
-    <script src="js/units/u15_newton.js"></script>
-    <script src="js/units/u16_ratio.js"></script>
-    <script src="js/units/u17_base.js"></script>
-    <script src="js/units/u18_divisor_multiple.js"></script>
-    <script src="js/units/u19_integer.js"></script>
-    <script src="js/units/u20_magic_square.js"></script>
-    <script src="js/units/u21_alphametic.js"></script>
-    <script src="js/units/u22_sequence.js"></script>
-    <script src="js/units/u23_quantity_other.js"></script>
-    <script src="js/ui.js"></script>
+    <script src="js/core.js?v=20261116a"></script>
+    <script src="js/geom.js?v=20261116a"></script>
+    <script src="js/units/u01_concentration.js?v=20261116a"></script>
+    <script src="js/units/u02_age.js?v=20261116a"></script>
+    <script src="js/units/u03_profit.js?v=20261116a"></script>
+    <script src="js/units/u04_average.js?v=20261116a"></script>
+    <script src="js/units/u05_equation1.js?v=20261116a"></script>
+    <script src="js/units/u06_simultaneous.js?v=20261116a"></script>
+    <script src="js/units/u07_indefinite.js?v=20261116a"></script>
+    <script src="js/units/u08_traveler.js?v=20261116a"></script>
+    <script src="js/units/u09_train.js?v=20261116a"></script>
+    <script src="js/units/u10_river.js?v=20261116a"></script>
+    <script src="js/units/u11_clock.js?v=20261116a"></script>
+    <script src="js/units/u12_speed_other.js?v=20261116a"></script>
+    <script src="js/units/u13_inequality.js?v=20261116a"></script>
+    <script src="js/units/u14_work.js?v=20261116a"></script>
+    <script src="js/units/u15_newton.js?v=20261116a"></script>
+    <script src="js/units/u16_ratio.js?v=20261116a"></script>
+    <script src="js/units/u17_base.js?v=20261116a"></script>
+    <script src="js/units/u18_divisor_multiple.js?v=20261116a"></script>
+    <script src="js/units/u19_integer.js?v=20261116a"></script>
+    <script src="js/units/u20_magic_square.js?v=20261116a"></script>
+    <script src="js/units/u21_alphametic.js?v=20261116a"></script>
+    <script src="js/units/u22_sequence.js?v=20261116a"></script>
+    <script src="js/units/u23_quantity_other.js?v=20261116a"></script>
+    <script src="js/units/u24_triangle_polygon.js?v=20261116a"></script>
+    <script src="js/units/u24_triangle_polygon2.js?v=20261116a"></script>
+    <script src="js/ui.js?v=20261116a"></script>
 </body>
 </html>

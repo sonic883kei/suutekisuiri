@@ -8,6 +8,7 @@
  */
 
 const ALL_UNITS = UnitRegistry.list();
+const APP_BUILD = '20261116a';   // index.html の data-build と同じ値にする（食い違うと画面に警告）
 
         let configUnit = 'all';
 
@@ -79,10 +80,13 @@ const ALL_UNITS = UnitRegistry.list();
             grid.innerHTML = `
                 <button onclick="selectConfigUnit('all')" data-unit="all" class="${cfgUnitBtnClass('all', true)}">
                     <i class="fa-solid fa-layer-group text-sm"></i>
-                    <span class="text-xs">全23単元 混合演習</span>
+                    <span class="text-xs">全${ALL_UNITS.length}単元 混合演習</span>
                 </button>
             `;
+            let lastSec = null;
             ALL_UNITS.forEach(u => {
+                const sec = u.section || '数的推理';
+                if (sec !== lastSec) { lastSec = sec; const h = document.createElement('div'); h.className = 'col-span-2 sm:col-span-3 text-xs font-bold text-indigo-300 mt-2 pt-1 border-t border-slate-700'; h.textContent = '■ ' + sec; grid.appendChild(h); }
                 const btn = document.createElement('button');
                 btn.onclick = () => selectConfigUnit(u.id);
                 btn.setAttribute('data-unit', u.id);
@@ -114,7 +118,7 @@ const ALL_UNITS = UnitRegistry.list();
             document.getElementById('nav-change-config-btn').classList.remove('hidden');
 
             const uObj = ALL_UNITS.find(u => u.id === configUnit);
-            const uName = uObj ? uObj.name : '全23単元 混合';
+            const uName = uObj ? uObj.name : `全${ALL_UNITS.length}単元 混合`;
             document.getElementById('active-config-badge').innerText = uName;
 
             sessionAnswers = [];
@@ -254,7 +258,10 @@ const ALL_UNITS = UnitRegistry.list();
         function renderCbtUnitCheckboxes() {
             const container = document.getElementById('cbt-unit-checkbox-grid');
             container.innerHTML = '';
+            let lastSec = null;
             ALL_UNITS.forEach(u => {
+                const sec = u.section || '数的推理';
+                if (sec !== lastSec) { lastSec = sec; const h = document.createElement('div'); h.className = 'col-span-2 text-xs font-bold text-indigo-300 mt-1 pt-1 border-t border-slate-700'; h.textContent = '■ ' + sec; container.appendChild(h); }
                 const isChecked = cbtSelectedUnits.includes(u.id);
                 const item = document.createElement('label');
                 item.className = 'flex items-center space-x-2 p-2 rounded-xl bg-[#1b233a] border border-slate-700 text-xs cursor-pointer hover:border-indigo-500';
@@ -706,7 +713,14 @@ const ALL_UNITS = UnitRegistry.list();
 
 
         window.addEventListener('DOMContentLoaded', () => {
+            const bn = document.getElementById('app-build');
+            if (bn) {
+                const same = document.body.getAttribute('data-build') === APP_BUILD;
+                bn.textContent = same ? `ビルド ${APP_BUILD}` : '⚠ index.html と ui.js の版が違います。Ctrl＋F5 で再読み込みしてください';
+                bn.className = 'text-center text-[10px] mt-3 ' + (same ? 'text-slate-600' : 'text-amber-400');
+            }
             renderUnitSelectionGrid();
+            { const e = document.getElementById('unit-count-text'); if (e) e.textContent = ALL_UNITS.length; }
             updateMistakeBadges();
             cbtSelectedUnits = ALL_UNITS.slice(0, 10).map(u => u.id);
             loadFixedPools();   // fixed を指定した単元がある場合のみ固定問題JSONを取得

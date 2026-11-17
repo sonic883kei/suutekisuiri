@@ -3,8 +3,9 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const root = path.join(__dirname, '..');
 const load = f => vm.runInThisContext(fs.readFileSync(path.join(root, f), 'utf8'), { filename: f });
 load('js/core.js');
+load('js/geom.js');
 fs.readdirSync(path.join(root, 'js/units')).sort().forEach(f => load('js/units/' + f));
-const R = vm.runInThisContext('({UnitRegistry, generateQuestion, generateChoices, initPRNG})');
+const R = vm.runInThisContext('({UnitRegistry, generateQuestion, generateChoices, initPRNG, Geom})');
 
 const N = Number(process.argv[2] || 3000);
 let totalBad = 0;
@@ -981,6 +982,159 @@ function checkU23(q, choices) {
     return ans === q.correctAnswer && oneOk && choices.every(c => strip(c).endsWith('円') && num(strip(c).replace(/[^\d,]/g, '')) === c.value);
 }
 
+
+// ㉔ の Lv.5〜11: 図の座標から長さ・角度を実測して答えを照合する
+function checkU24b(q, choices) {
+    const G = R.Geom, num = Number, t = q.text, strip = c => c.htmlText.replace(/^.\s*/, '');
+    const near = (a, b, e = 1e-6) => Math.abs(a - b) < e;
+    const len = (a, b) => G.len(G.sub(a, b)), ang = (v, a, b) => G.angle(v, a, b);
+    const col = (a, b, c) => Math.abs(G.cross(G.sub(b, a), G.sub(c, a))) < 1e-6 * (1 + len(a, b) * len(a, c));
+    const par = (a, b, c, d) => Math.abs(G.cross(G.sub(b, a), G.sub(d, c))) < 1e-6 * len(a, b) * len(c, d);
+    const gcd = (a, b) => b ? gcd(b, a % b) : a;
+    const oneOk = choices.length === 5 && choices.filter(c => c.isCorrect).length === 1 && new Set(choices.map(c => c.value)).size === 5 && choices.every(c => c.value > 0) && choices.some(c => c.isCorrect && c.value === q.correctAnswer);
+    const consec = () => choices.map(c => c.value).sort((a, b) => a - b).every((v, i, a) => i === 0 || near(v - a[i - 1], a[1] - a[0], 1e-9));
+    const labs = () => { const P = {}; ((q.figure && q.figure.items) || []).filter(i => i.k === 'lab').forEach(l => P[l.s] = l.p); return P; };
+    const has = (P, ks) => ks.split('').every(k => P[k]);
+    const evalS = str => Function('"use strict";return (' + str.replace(/−/g, '-').replace(/×/g, '*').replace(/√(\d+)/g, 'Math.sqrt($1)').replace(/(\d|\))\s*Math/g, '$1*Math') + ')')();
+    const parseCh = c => { const s = strip(c).replace(/\s*m$/, ''), m = s.match(/^\{\{(.+?)\/(.+)\}\}$/); return m ? evalS(m[1]) / evalS(m[2]) : evalS(s); };
+    const fracVal = c => { const s = strip(c).replace(/cm$/, ''), m = s.match(/^\{\{(\d+)\/(\d+)\}\}$/); return m ? { n: num(m[1]), d: num(m[2]), v: num(m[1]) / num(m[2]) } : { n: num(s), d: 1, v: num(s) }; };
+    const texts = () => ((q.figure && q.figure.items) || []).filter(i => i.k === 'txt').map(i => i.s);
+    let m;
+    if (q.title === '有名三角形') {
+        m = t.match(/結んだとき.*?角は (\d+)° であり.*?(\d+)m 進んだ地点では、(\d+)°/); if (!m) return false;
+        const a = num(m[1]), d = num(m[2]), b = num(m[3]), rad = x => x * Math.PI / 180, h = d / (1 / Math.tan(rad(a)) - 1 / Math.tan(rad(b)));
+        const vals = choices.map(c => { try { return parseCh(c); } catch (e) { return NaN; } });
+        if (vals.some(v => !Number.isFinite(v))) return false;
+        return oneOk && near(q.correctAnswer, h, 1e-9) && choices.every((c, i) => near(vals[i], c.value, 1e-9) && c.isCorrect === near(vals[i], h, 1e-9) && / m$/.test(strip(c)))
+            && vals.every((v, i) => (i === 0 || v > vals[i - 1]) && vals.every((w, j) => i === j || Math.abs(v - w) / v > 0.01));
+    }
+    if (q.title === '三角形の相似①') {
+        m = t.match(/AE：EC＝(\d+)：(\d+)、CE＝EF＝(\d+)cm であるとき、(ED|DF|CG)の長さ/); const P = labs(); if (!m || !has(P, 'ABCDEFG')) return false;
+        const [mm, nn, c, tg] = [num(m[1]), num(m[2]), num(m[3]), m[4]];
+        const ok = near(len(P.B, P.C), len(P.C, P.D)) && col(P.B, P.C, P.D) && par(P.C, P.G, P.D, P.F) && G.onSeg(P.E, P.A, P.C) && G.onSeg(P.E, P.F, P.D) && G.onSeg(P.G, P.A, P.B)
+            && near(len(P.A, P.E) / len(P.E, P.C), mm / nn) && near(len(P.C, P.E), c) && near(len(P.E, P.F), c) && texts().length === 2 && texts().every(x => x === c + 'cm');
+        const meas = tg === 'ED' ? len(P.E, P.D) : tg === 'DF' ? len(P.D, P.F) : len(P.C, P.G);
+        return ok && near(meas, q.correctAnswer) && oneOk && consec() && choices.every(c => /^\d+cm$/.test(strip(c)));
+    }
+    if (q.title === '三平方の定理') {
+        m = t.match(/長辺の長さが (\d+)cm、短辺の長さが (\d+)cm.*?AE ＝ (\d+)cm.*?、(AP|PB) の長さ/); const P = labs(); if (!m || !has(P, 'ABCDPEQ')) return false;
+        const [W, H, a, tg] = [num(m[1]), num(m[2]), num(m[3]), m[4]];
+        const d = G.unit(G.sub(P.Q, P.P)), v = G.sub(P.B, P.P), proj = G.add(P.P, G.mul(d, G.dot(v, d))), refl = G.sub(G.mul(proj, 2), P.B);   // B を折り目 PQ について折り返した点
+        const ok = near(len(P.A, P.D), W) && near(len(P.A, P.B), H) && near(len(P.A, P.E), a) && W > H && G.onSeg(P.E, P.A, P.D) && G.onSeg(P.P, P.A, P.B) && G.onSeg(P.Q, P.B, P.C)
+            && near(refl[0], P.E[0]) && near(refl[1], P.E[1]) && texts().join() === [W, a, H].map(x => x + 'cm').join();
+        const meas = tg === 'AP' ? len(P.A, P.P) : len(P.P, P.B);
+        return ok && near(meas, q.correctAnswer) && oneOk && consec() && choices.every(c => /^\d+cm$/.test(strip(c)));
+    }
+    if (q.title === 'チェバ・メネラウスの定理') {
+        m = t.match(/AF：FC＝(\d+)：(\d+)、DC：CB＝(\d+)：(\d+)、(?:EB＝(\d+)cm とするとき、AE|AE＝(\d+)cm とするとき、EB) の長さ/); const P = labs(); if (!m || !has(P, 'ABCDEF')) return false;
+        const [p, q2, r, s] = [1, 2, 3, 4].map(i => num(m[i])), askAE = m[5] !== undefined, given = num(m[5] || m[6]);
+        const ok = gcd(p, q2) === 1 && gcd(r, s) === 1 && col(P.B, P.C, P.D) && G.onSeg(P.C, P.B, P.D) && G.onSeg(P.E, P.A, P.B) && G.onSeg(P.F, P.A, P.C) && col(P.E, P.F, P.D)
+            && near(len(P.A, P.F) / len(P.F, P.C), p / q2) && near(len(P.D, P.C) / len(P.C, P.B), r / s);
+        const rat = len(P.A, P.E) / len(P.E, P.B), exp = askAE ? given * rat : given / rat;
+        return ok && near(exp, q.correctAnswer) && oneOk && choices.every(c => /^.\s\d+\.\d{1,2}cm$/.test(c.htmlText) && near(num(strip(c).replace('cm', '')), c.value, 1e-9))
+            && choices.every((c, i, a) => i === 0 || c.value > a[i - 1].value) && choices.every(c => c.isCorrect === near(c.value, exp, 1e-9));
+    }
+    if (q.title === '角度・内角の和①') {
+        const P = labs(); if (!has(P, 'ABCD')) return false;
+        const mA = t.match(/∠BDC＝(\d+)° の三角形/), mD = t.match(/∠BAC＝(\d+)°/), kk = t.match(/∠ABD＝(\d)∠CBD/), k = kk ? num(kk[1]) : 1;
+        if (!!mA === !!mD) return false;
+        const aBD = ang(P.B, P.A, P.D), cBD = ang(P.B, P.C, P.D), aCD = ang(P.C, P.A, P.D), bCD = ang(P.C, P.B, P.D);
+        const ok = near(aBD, k * cBD) && near(aCD, k * bCD) && near(aBD + cBD, ang(P.B, P.A, P.C)) && near(aCD + bCD, ang(P.C, P.A, P.B));      // D は三角形の内側
+        const given = mA ? num(mA[1]) : num(mD[1]), gm = mA ? ang(P.D, P.B, P.C) : ang(P.A, P.B, P.C), ans = mA ? ang(P.A, P.B, P.C) : ang(P.D, P.B, P.C);
+        const gi = q.figure.items.find(i => i.k === 'ang' && i.tag === 'given');
+        return ok && near(gm, given) && near(ans, q.correctAnswer) && gi && gi.s === given + '°' && oneOk && consec() && choices.every(c => /^.\s\d+°$/.test(c.htmlText) && c.value < 180);
+    }
+    if (q.title === '角度・内角の和②') {
+        const gi = q.figure.items.find(i => i.k === 'ang' && i.tag === 'given'); if (!gi || !/√3 ＝ 1\.732/.test(t)) return false;
+        const th = num(gi.s.replace('°', '')), eye = gi.v, top = gi.b, h0 = num(t.match(/高さ ([\d.]+)m の位置/)[1]);
+        let ok = near(ang(eye, gi.a, top), th) && near(eye[1], h0) && t.includes(th + '°') && near(gi.a[1], eye[1]);
+        let x;
+        if (/離れた/.test(t)) { const d = num(t.match(/から (\d+)m 離れた/)[1]); ok = ok && near(top[0] - eye[0], d); x = th === 30 ? d * 1.732 / 3 : d * 1.732; }
+        else { const L = num(t.match(/上端までの距離は (\d+)m/)[1]); ok = ok && near(len(eye, top), L); x = th === 30 ? L / 2 : L * 1.732 / 2; }
+        const v = h0 + x;
+        return ok && Math.abs(top[1] - q.correctAnswer) <= 0.05 + 1e-9 && near(Math.round(v * 10) / 10, q.correctAnswer, 1e-9) && Math.abs(v * 10 - Math.floor(v * 10) - 0.5) >= 0.1 && oneOk && consec() && choices.every(c => /^.\s\d+\.\dm$/.test(c.htmlText));
+    }
+    if (q.title === '三角形の相似②') {
+        m = t.match(/BE：EC＝(\d+)：(\d+) に分ける.*?線分 DE (の中点|を DF：FE＝(\d+)：(\d+) に分ける点)を F.*?BC の長さを (\d+)cm とした場合、線分 (GE|BG|GC) の長さ/); const P = labs(); if (!m || !has(P, 'ABCDEFG')) return false;
+        const mm = num(m[1]), nn = num(m[2]), u = m[4] ? num(m[4]) : 1, v = m[5] ? num(m[5]) : 1, L = num(m[6]), tg = m[7];
+        const ok = gcd(mm, nn) === 1 && near(len(P.B, P.C), L) && G.onSeg(P.E, P.B, P.C) && near(len(P.B, P.E) / len(P.E, P.C), mm / nn) && G.onSeg(P.D, P.A, P.B) && par(P.D, P.E, P.A, P.C)
+            && G.onSeg(P.F, P.D, P.E) && near(len(P.D, P.F) / len(P.F, P.E), u / v) && G.onSeg(P.G, P.B, P.E) && col(P.A, P.F, P.G);
+        const meas = tg === 'GE' ? len(P.G, P.E) : tg === 'BG' ? len(P.B, P.G) : len(P.G, P.C);
+        const fv = choices.map(fracVal);
+        return ok && near(meas, q.correctAnswer) && oneOk && fv.every((f, i) => f.d > 1 && gcd(f.n, f.d) === 1 && near(f.v, choices[i].value, 1e-9) && choices[i].isCorrect === near(f.v, meas, 1e-9) && (i === 0 || f.v < fv[i - 1].v));
+    }
+    return undefined;
+}
+
+// ㉔ 三角形と多角形: 図の座標から角度・長さを実測／列挙して照合する
+function checkU24(q, choices) {
+    const G = R.Geom, strip = c => c.htmlText.replace(/^.\s*/, '');
+    const oneOk = choices.length === 5 && choices.filter(c => c.isCorrect).length === 1 && new Set(choices.map(c => c.value)).size === 5 && choices.every(c => c.value > 0) && choices.some(c => c.isCorrect && c.value === q.correctAnswer);
+    const rb = checkU24b(q, choices); if (rb !== undefined) return rb;
+    const t = q.text, num = Number;
+    const consec = () => choices.map(c => c.value).sort((a, b) => a - b).every((v, i, a) => i === 0 || v - a[i - 1] === a[1] - a[0]);
+    const ang = (v, a, b) => { const d = Math.abs(Math.atan2(a[1] - v[1], a[0] - v[0]) - Math.atan2(b[1] - v[1], b[0] - v[0])) * 180 / Math.PI; return d > 180 ? 360 - d : d; };
+    const M = t.match.bind(t);
+    if (q.title === '多角形の内角') {
+        let m, ans;
+        // 座標を作って実測
+        const regular = n => { const P = [...Array(n).keys()].map(i => [Math.cos(2 * Math.PI * i / n), Math.sin(2 * Math.PI * i / n)]); return ang(P[0], P[n - 1], P[1]); };
+        if ((m = M(/^正(\d+)角形の1つの内角/))) ans = Math.round(regular(num(m[1])));
+        else if ((m = M(/^(\d+)角形の内角の和/))) { const n = num(m[1]); let s = 0; const P = [...Array(n).keys()].map(i => [Math.cos(2 * Math.PI * i / n), Math.sin(2 * Math.PI * i / n)]); for (let i = 0; i < n; i++) s += ang(P[i], P[(i + n - 1) % n], P[(i + 1) % n]); ans = Math.round(s); }
+        else { m = M(/1つの(外|内)角が (\d+)° である正多角形/); if (!m) return false; const a = num(m[2]); ans = 0; for (let n = 3; n <= 400; n++) { const inn = Math.round(regular(n) * 1e6) / 1e6; if (Math.abs((m[1] === '内' ? inn : 180 - inn) - a) < 1e-6) { if (ans) return false; ans = n; } } }
+        if (ans !== q.correctAnswer || !oneOk) return false;
+        return consec() && choices.every(c => strip(c).endsWith(q.unitSuffix === '角形' ? '角形' : '°'));
+    }
+    if (q.title === '多角形の対角線') {
+        const cnt = n => { let k = 0; for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) if (!(i === 0 && j === n - 1)) k++; return k; };
+        let m, ans;
+        if ((m = M(/^正(\d+)角形の対角線/))) ans = cnt(num(m[1]));
+        else if ((m = M(/^対角線の本数が (\d+) 本/))) { ans = 0; for (let n = 3; n < 100; n++) if (cnt(n) === num(m[1])) { if (ans) return false; ans = n; } }
+        else if ((m = M(/引ける対角線は (\d+) 本ある/))) ans = cnt(num(m[1]) + 3);
+        else if ((m = M(/内角の和が (\d+)° である/))) { const n = num(m[1]) / 180 + 2; if (!Number.isInteger(n)) return false; ans = cnt(n); }
+        else return false;
+        return ans === q.correctAnswer && oneOk && (q.consecutive ? consec() : true) && choices.every(c => /^(\d+)(本|角形)$/.test(strip(c)) && num(strip(c).replace(/\D/g, '')) === c.value);
+    }
+    const it = q.figure && q.figure.items; if (!it) return false;
+    if (q.title === '同位角と錯角') {
+        const m = M(/^図のような正(\d+)角形と二本の平行線/); if (!m) return false; const n = num(m[1]);
+        const poly = it.find(i => i.k === 'poly'), segs = it.filter(i => i.k === 'seg'), angs = it.filter(i => i.k === 'ang');
+        if (!poly || poly.pts.length !== n || segs.length !== 2) return false;
+        const P = poly.pts, e = [...P.keys()].map(i => G.len(G.sub(P[(i + 1) % n], P[i])));
+        if (e.some(l => Math.abs(l - e[0]) > 1e-6)) return false;                                   // 正多角形（辺が等しい）
+        const interior = ang(P[0], P[n - 1], P[1]); for (let i = 0; i < n; i++) if (Math.abs(ang(P[i], P[(i + n - 1) % n], P[(i + 1) % n]) - 180 * (n - 2) / n) > 1e-6) return false;
+        void interior;
+        if (segs.some(s => Math.abs(s.a[1] - s.b[1]) > 1e-9) || Math.abs(segs[0].a[1] - segs[1].a[1]) < 1e-6) return false;   // 平行（水平）
+        const lo = segs[0].a[1] < segs[1].a[1] ? segs[0] : segs[1], hi = lo === segs[0] ? segs[1] : segs[0];
+        const X = angs.find(a => a.tag === 'x'), Gv = angs.find(a => a.tag === 'given'); if (!X || !Gv) return false;
+        if (!P.some(p => Math.abs(p[0] - X.v[0]) < 1e-9 && Math.abs(p[1] - X.v[1]) < 1e-9) || Math.abs(X.v[1] - lo.a[1]) > 1e-9) return false;   // 頂点が下の線上
+        if (P.some(p => p[1] < lo.a[1] - 1e-9)) return false;                                        // 下の線より下に出ない
+        if (Math.abs(Gv.v[1] - hi.a[1]) > 1e-9) return false;                                        // 与角の頂点は上の線上
+        const onPoly = P.some((p, i) => { const q2 = P[(i + 1) % n], cr = (q2[0] - p[0]) * (Gv.v[1] - p[1]) - (q2[1] - p[1]) * (Gv.v[0] - p[0]); return Math.abs(cr) < 1e-6 && Gv.v[0] >= Math.min(p[0], q2[0]) - 1e-9 && Gv.v[0] <= Math.max(p[0], q2[0]) + 1e-9; });
+        if (!onPoly) return false;
+        const given = ang(Gv.v, Gv.a, Gv.b), xm = ang(X.v, X.a, X.b);
+        const gTxt = num(Gv.s.replace('°', ''));
+        if (Math.abs(given - gTxt) > 1e-6) return false;                                             // 図に書いた α が実測と一致
+        // x を実測（x は下の線と、頂点から出る辺とのあいだの角で、多角形の外側）
+        if (Math.abs(xm - q.correctAnswer) > 1e-6) return false;
+        return oneOk && consec() && choices.every(c => strip(c) === c.value + '°');
+    }
+    if (q.title === '三角形の外角') {
+        const poly = it.find(i => i.k === 'poly'), vs = it.filter(i => i.k === 'ang' && i.tag === 'v'), labs = it.filter(i => i.k === 'lab');
+        if (!poly || vs.length !== poly.pts.length || labs.length !== vs.length) return false;
+        const P = poly.pts, m = P.length; if (m < 5 || m > 7) return false;
+        let sum = 0; vs.forEach(v => { sum += ang(v.v, v.a, v.b); });
+        if (Math.abs(sum - q.correctAnswer) > 1e-6 && Math.abs(Math.round(sum) - q.correctAnswer) > 1e-6) { if (Math.abs(sum - q.correctAnswer) > 1e-6) return false; }
+        const lt = [...t.matchAll(/∠([A-Z])/g)].map(x => x[1]); if (lt.length !== m || new Set(lt).size !== m) return false;
+        if (lt.some((c, i) => c !== String.fromCharCode(65 + i)) || new Set(labs.map(l => l.s)).size !== m) return false;
+        // 閉じた折れ線の向きの回転量が 720°
+        let turn = 0; for (let i = 0; i < m; i++) { const a = P[i], b = P[(i + 1) % m], c = P[(i + 2) % m], d1 = Math.atan2(b[1] - a[1], b[0] - a[0]), d2 = Math.atan2(c[1] - b[1], c[0] - b[0]); let d = (d2 - d1) * 180 / Math.PI; while (d > 180) d -= 360; while (d <= -180) d += 360; turn += d; }
+        if (Math.abs(Math.abs(turn) - 720) > 1e-6) return false;
+        return oneOk && consec() && choices.every(c => strip(c) === c.value + '°');
+    }
+    return false;
+}
+
 console.log(`単元数: ${R.UnitRegistry.list().length} / 各単元 ${N} 回生成\n`);
 for (const u of R.UnitRegistry.list()) {
     if (process.env.ONLY && !process.env.ONLY.split(',').includes(u.id)) continue;
@@ -1002,6 +1156,7 @@ for (const u of R.UnitRegistry.list()) {
         if (ch.length !== 5 || ch.filter(c => c.isCorrect).length !== 1) note('選択肢が5個/正解1つでない', q.title);
         seen.add(q.text + q.prompt);
         if (u.id === 'u10' && !checkU10(q, ch)) note('u10: 別解法と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
+        if (u.id === 'u24' && !checkU24(q, ch)) note('u24: 図の実測・列挙と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u23' && !checkU23(q, ch)) note('u23: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u22' && !checkU22(q, ch)) note('u22: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u21' && !checkU21(q, ch)) note('u21: 総当たりと不一致', q.title + ' ' + (q.prompt));

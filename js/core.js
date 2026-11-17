@@ -75,7 +75,7 @@ function escapeHTML(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 function renderFractions(str) {   // {{n/d}} → 縦書き分数のHTML
-    return String(str).replace(/\{\{(\d+)\/(\d+)\}\}/g, '<span class="frac"><span class="frac-n">$1</span><span class="frac-d">$2</span></span>');
+    return String(str).replace(/\{\{([\d√\s−+()×.]+)\/([\d√\s−+()×.]+)\}\}/g, '<span class="frac"><span class="frac-n">$1</span><span class="frac-d">$2</span></span>');
 }
 function renderRich(str) { return renderFractions(escapeHTML(str)); }   // 問題文用（HTMLをエスケープしてから分数変換）
 
@@ -101,6 +101,7 @@ function renderFigure(fig) {
         }).join('') + '</tr>').join('');
         return `<table class="fig-calc"><tbody>${body}</tbody></table>`;
     }
+    if (fig.type === 'geom' && typeof geomSvg === 'function') return geomSvg(fig);   // 図形分野（js/geom.js）
     if (fig.type === 'tri') {
         const pts = [[120, 28], [28, 182], [212, 182], [74, 105], [120, 182], [166, 105]];   // 頂点3つ → 辺の中点3つ(左辺・底辺・右辺)
         const lines = [[0, 1], [1, 2], [2, 0]].map(([a, b]) => `<line x1="${pts[a][0]}" y1="${pts[a][1]}" x2="${pts[b][0]}" y2="${pts[b][1]}" class="fig-line"/>`).join('');
@@ -168,7 +169,7 @@ function generateQuestion(unitId, level) {
                 const show = (v) => (q.decimals ? v.toFixed(q.decimals) : v.toLocaleString());
                 return [0, 1, 2, 3, 4].map(i => {
                     const val = c + (i - pos) * st;
-                    return { value: val, label: lab[i], htmlText: `${lab[i]} ${q.unitPrefix || ''}${show(val)} ${suf}`.trim(), isCorrect: val === c };
+                    return { value: val, label: lab[i], htmlText: `${lab[i]} ${q.unitPrefix || ''}${show(val)}${q.tight ? '' : ' '}${suf}`.trim(), isCorrect: val === c };
                 });
             }
 
@@ -195,7 +196,7 @@ function generateQuestion(unitId, level) {
             return arr.map((val, idx) => ({
                 value: val,
                 label: labels[idx] || `${idx + 1}`,
-                htmlText: `${labels[idx] || ''} ${q.unitPrefix || ''}${val.toLocaleString()} ${unitSuffix}`.trim(),
+                htmlText: `${labels[idx] || ''} ${q.unitPrefix || ''}${val.toLocaleString()}${q.tight ? '' : ' '}${unitSuffix}`.trim(),
                 isCorrect: val === correctVal
             }));
         }
