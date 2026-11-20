@@ -1257,6 +1257,100 @@ function checkU25(q, choices) {
 }
 function tpInterCheck(p1, p2, p3, p4) { const G = R.Geom, d1 = G.sub(p2, p1), d2 = G.sub(p4, p3), tt = G.cross(G.sub(p3, p1), d2) / G.cross(d1, d2); return G.add(p1, G.mul(d1, tt)); }
 
+// ㉖ 面積（三角形）: 図の座標から長さ・角・面積を実測して、答え・選択肢と照合する
+function checkU26(q, choices) {
+    const G = R.Geom, num = Number, t = q.text, p = q.prompt, strip = c => c.htmlText.replace(/^.\s*/, '');
+    const near = (a, b, e = 1e-6) => Math.abs(a - b) < e;
+    const len = (a, b) => G.len(G.sub(a, b)), gcd = (a, b) => b ? gcd(b, a % b) : a;
+    const area = pts => Math.abs(pts.reduce((s, a, i) => s + G.cross(a, pts[(i + 1) % pts.length]), 0)) / 2;
+    const items = (q.figure && q.figure.items) || [], P = {}; items.filter(i => i.k === 'lab').forEach(l => P[l.s] = l.p);
+    const has = ks => ks.split('').every(k => P[k]);
+    const oneOk = choices.length === 5 && choices.filter(c => c.isCorrect).length === 1 && new Set(choices.map(c => c.value)).size === 5 && choices.some(c => c.isCorrect && near(c.value, q.correctAnswer, 1e-9));
+    const asc = () => choices.every((c, i, a) => i === 0 || c.value > a[i - 1].value);
+    const consec = () => choices.map(c => c.value).every((v, i, a) => i === 0 || near(v - a[i - 1], a[1] - a[0], 1e-9));
+    const lbl = tag => { const it = items.find(i => i.k === 'txt' && i.tag === tag); return it ? num(it.s.replace('cm', '')) : null; };
+    const surdVal = s => { let m = s.match(/^\{\{(\d*)√(\d+)\/(\d+)\}\}$/); if (m) return (m[1] ? num(m[1]) : 1) * Math.sqrt(num(m[2])) / num(m[3]); m = s.match(/^\{\{(\d+)\/(\d+)\}\}$/); if (m) return num(m[1]) / num(m[2]); m = s.match(/^(\d*)√(\d+)$/); return m ? (m[1] ? num(m[1]) : 1) * Math.sqrt(num(m[2])) : (/^\d+$/.test(s) ? num(s) : NaN); };
+    const ratioOf = c => { const m = strip(c).match(/^(\d+)：(\d+)$/); return m ? [num(m[1]), num(m[2])] : null; };
+    const fracOf = c => { const m = strip(c).match(/^\{\{(\d+)\/(\d+)\}\}$/); return m ? [num(m[1]), num(m[2])] : null; };
+    const correct = () => choices.find(c => c.isCorrect);
+    if (!Array.isArray(q.steps) || q.steps.length < 2) return false;
+    let mm;
+    if (q.title === '面積の加減') {
+        const o = items.find(i => i.tag === 'outline'), h = items.find(i => i.tag === 'hatch'); if (!o || !h || o.pts.length !== 4) return false;
+        const [Q, V, T, L] = o.pts, M = h.pts[1], two = h.pts.length === 4, rts = items.filter(i => i.k === 'rt');
+        const dotv = (v, a, b) => G.dot(G.sub(a, v), G.sub(b, v));
+        let ok = near(dotv(Q, V, L), 0, 1e-6) && near(dotv(T, L, V), 0, 1e-6) && rts.length === 2 && rts.every(r => near(r.v[0], Q[0]) && near(r.v[1], Q[1]) || near(r.v[0], T[0]) && near(r.v[1], T[1]));
+        ok = ok && near(len(Q, L), lbl('LQ')) && near(len(T, V), lbl('TV')) && near(len(L, M), lbl('LM')) && G.onSeg(M, L, T) && near(len(h.pts[0], L), 0) && near(len(h.pts[2], V), 0);
+        if (two) { const W = h.pts[3]; ok = ok && G.onSeg(W, Q, V) && near(len(W, V), lbl('WV')); } else ok = ok && lbl('WV') === null;
+        return ok && near(area(h.pts), q.correctAnswer) && Number.isInteger(q.correctAnswer) && oneOk && consec() && asc() && choices.every(c => /^.\s\d+cm²$/.test(c.htmlText));
+    }
+    if (q.title === '三角形の高さ') {
+        if (!has('ABC')) return false;
+        const sides = [...t.matchAll(/(AB|BC|AC)＝(\d+)/g)].map(x => [x[1], num(x[2])]), an = t.match(/∠(\w)＝(\d+)°/); if (sides.length !== 2 || !an) return false;
+        const v = an[1], th = num(an[2]), others = 'ABC'.split('').filter(x => x !== v);
+        if (!sides.every(s => s[0].includes(v))) return false;                    // 2辺は角の頂点をはさむ辺
+        if (!near(G.angle(P[v], P[others[0]], P[others[1]]), th, 1e-6)) return false;
+        if (!sides.every(s => near(len(P[s[0][0]], P[s[0][1]]), s[1]))) return false;
+        const S = Math.abs(G.cross(G.sub(P.B, P.A), G.sub(P.C, P.A))) / 2, gi = items.find(i => i.k === 'ang' && i.tag === 'given');
+        const vals = choices.map(c => surdVal(strip(c)));
+        return near(S, q.correctAnswer, 1e-7) && gi && gi.s === th + '°' && oneOk && asc() && vals.every((x, i) => near(x, choices[i].value, 1e-9)) && choices.every(c => c.isCorrect === near(c.value, S, 1e-7)) && [30, 45, 60, 120, 135, 150].includes(th);
+    }
+    if (q.title === '面積比（相似比）') {
+        if (!has('ABCDE')) return false;
+        const mm = t.match(/AB＝(\d+)cm、BC＝(\d+)cm/); if (!mm) return false; const c = num(mm[1]), a = num(mm[2]);
+        if (!near(len(P.A, P.B), c) || !near(len(P.B, P.C), a) || gcd(c, a) !== 1) return false;
+        const ok = G.onSeg(P.D, P.A, P.C) && G.onSeg(P.E, P.A, P.B) && near(G.angle(P.B, P.A, P.D), G.angle(P.B, P.D, P.C), 1e-6) && near(G.cross(G.sub(P.D, P.E), G.sub(P.C, P.B)), 0, 1e-6);
+        const whole = /三角形 ABC の面積と三角形 AED/.test(p), trap = /三角形 AED の面積と四角形 EBCD/.test(p); if (whole === trap) return false;
+        const sABC = area([P.A, P.B, P.C]), sAED = area([P.A, P.E, P.D]), exp = whole ? sABC / sAED : sAED / (sABC - sAED);
+        const rs = choices.map(ratioOf); if (rs.some(r => !r || gcd(r[0], r[1]) !== 1)) return false;
+        return ok && near(exp, q.correctAnswer, 1e-9) && oneOk && rs.every((r, i) => near(r[0] / r[1], choices[i].value, 1e-12) && (i === 0 || r[0] > rs[i - 1][0] || (r[0] === rs[i - 1][0] && r[1] > rs[i - 1][1]))) && choices.every(c => c.isCorrect === near(c.value, exp, 1e-9));
+    }
+    if (q.title === '面積比（面積公式）') {
+        if (!has('ABCDEF')) return false;
+        mm = t.match(/それぞれ (\d+)：(\d+) に内分する/); if (!mm) return false; const mA = num(mm[1]), nA = num(mm[2]), s = mA + nA; if (gcd(mA, nA) !== 1 || mA === nA) return false;
+        const eq = near(len(P.A, P.B), len(P.B, P.C), 1e-9) && near(len(P.B, P.C), len(P.C, P.A), 1e-9);
+        const ok = eq && near(len(P.A, P.D) / len(P.A, P.B), mA / s, 1e-9) && near(len(P.B, P.E) / len(P.B, P.C), mA / s, 1e-9) && near(len(P.C, P.F) / len(P.C, P.A), mA / s, 1e-9) && G.onSeg(P.D, P.A, P.B) && G.onSeg(P.E, P.B, P.C) && G.onSeg(P.F, P.C, P.A);
+        const sA = area([P.A, P.B, P.C]), sD = area([P.D, P.E, P.F]), dots = items.filter(i => i.k === 'dot').length;
+        if (dots !== 3 * (s - 1)) return false;
+        if (/何%か/.test(t)) return ok && near(100 * sD / sA, q.correctAnswer, 1e-7) && oneOk && consec() && asc() && choices.every(c => /^.\s\d+(\.\d{1,2})?%$/.test(c.htmlText) && c.value > 0 && c.value < 100) && near(q.correctAnswer * 100, Math.round(q.correctAnswer * 100), 1e-7);
+        if ((mm = t.match(/面積が (\d+)cm² のとき/))) { const S = num(mm[1]), ans = S * sD / sA; return ok && near(ans, q.correctAnswer, 1e-7) && Number.isInteger(Math.round(ans * 1e6) / 1e6) && oneOk && asc() && choices.every(c => /^.\s\d+cm²$/.test(c.htmlText) && c.value > 0 && c.value < S); }
+        if (/面積の比を最も簡単/.test(t)) { const rs = choices.map(ratioOf); if (rs.some(r => !r || gcd(r[0], r[1]) !== 1)) return false; const x = sA / sD; return ok && near(x, q.correctAnswer, 1e-9) && oneOk && rs.every((r, i) => near(r[0] / r[1], choices[i].value, 1e-12) && (i === 0 || r[0] > rs[i - 1][0] || (r[0] === rs[i - 1][0] && r[1] > rs[i - 1][1]))) && choices.every(c => c.isCorrect === near(c.value, x, 1e-9)); }
+        return false;
+    }
+    if (q.title === '面積比（相似）・B') {
+        const tris = items.filter(i => i.tag === 'tri').sort((a, b) => a.lv - b.lv), hs = items.filter(i => i.tag === 'hatch'); if (tris.length < 4 || !hs.length) return false;
+        const n = tris.length - 1, base = area(tris[0].pts);
+        const isMid = (pt, tri) => [0, 1, 2].some(i => near(len(pt, G.lerp(tri[i], tri[(i + 1) % 3], 0.5)), 0, 1e-9));
+        if (!tris.every((tr, j) => j === 0 || tr.pts.every(pt => isMid(pt, tris[j - 1].pts)))) return false;
+        if (!near(Math.abs(len(tris[0].pts[0], tris[0].pts[1]) - len(tris[0].pts[1], tris[0].pts[2])), 0, 1e-9)) return false;
+        const inside = (pt, tri) => { const s = [0, 1, 2].map(i => Math.sign(G.cross(G.sub(tri[(i + 1) % 3], tri[i]), G.sub(pt, tri[i])))); return s.every(v => v === s[0]) && s[0] !== 0; };
+        const lev = h => { const c = [h.pts.reduce((a, b) => a + b[0], 0) / h.pts.length, h.pts.reduce((a, b) => a + b[1], 0) / h.pts.length]; let L = -1; tris.forEach((tr, j) => { if (inside(c, tr.pts)) L = j; }); return L; };
+        const levs = hs.map(lev), set = [...new Set(levs)].sort((a, b) => a - b);
+        if (set.some(x => x < 0) || !set.every(x => x % 2 === set[0] % 2) || set.length < 2) return false;
+        const par = set[0] % 2, cnt = j => j === n ? 1 : 3;
+        for (let j = 0; j <= n; j++) { const c = levs.filter(x => x === j).length; if (j % 2 === par ? c !== cnt(j) : c !== 0) return false; }      // 1つおきの層だけがすべて斜線
+        for (let i = 0; i < hs.length; i++) for (let k = 0; k < hs.length; k++) if (i !== k) { const c = [hs[i].pts.reduce((a, b) => a + b[0], 0) / 3, hs[i].pts.reduce((a, b) => a + b[1], 0) / 3]; if (inside(c, hs[k].pts)) return false; }
+        const sh = hs.reduce((s, h) => s + area(h.pts), 0) / base, white = /斜線のない部分/.test(t), exp = white ? 1 - sh : sh;
+        const fs = choices.map(fracOf); if (fs.some(f => !f || gcd(f[0], f[1]) !== 1)) return false;
+        return near(exp, q.correctAnswer, 1e-12) && oneOk && asc() && fs.every((f, i) => near(f[0] / f[1], choices[i].value, 1e-12)) && choices.every(c => c.isCorrect === near(c.value, exp, 1e-12)) && exp > 0 && exp < 1;
+    }
+    if (q.title === '面積比（面積公式）・B') {
+        if (!has('ABCDE')) return false;
+        const rr = [...t.matchAll(/(\d+)：(\d+) に内分する点を/g)].map(x => [num(x[1]), num(x[2])]); if (rr.length !== 2 || rr.some(r => gcd(r[0], r[1]) !== 1)) return false;
+        let ok = true;
+        if ((mm = t.match(/AB＝AC＝(\d+)cm、BC＝(\d+)cm の二等辺/))) ok = near(len(P.A, P.B), num(mm[1])) && near(len(P.A, P.C), num(mm[1])) && near(len(P.B, P.C), num(mm[2]));
+        else if ((mm = t.match(/∠A＝90°、AB＝(\d+)cm、AC＝(\d+)cm/))) ok = near(len(P.A, P.B), num(mm[1])) && near(len(P.A, P.C), num(mm[2])) && near(G.dot(G.sub(P.B, P.A), G.sub(P.C, P.A)), 0, 1e-6) && items.some(i => i.k === 'rt');
+        else return false;
+        const s1 = rr[0][0] + rr[0][1], s2 = rr[1][0] + rr[1][1];
+        ok = ok && G.onSeg(P.D, P.A, P.B) && G.onSeg(P.E, P.A, P.C) && near(len(P.A, P.D) / len(P.A, P.B), rr[0][0] / s1, 1e-9) && near(len(P.A, P.E) / len(P.A, P.C), rr[1][0] / s2, 1e-9);
+        const dots = items.filter(i => i.k === 'dot').length; if (dots !== s1 - 1 + s2 - 1) return false;
+        const tg = (p.match(/^(△ADE|△BDE|△CDE|四角形 DBCE)/) || [])[1]; if (!tg) return false;
+        const poly = { '△ADE': [P.A, P.D, P.E], '△BDE': [P.B, P.D, P.E], '△CDE': [P.C, P.D, P.E], '四角形 DBCE': [P.D, P.B, P.C, P.E] }[tg], exp = area(poly);
+        return ok && near(exp, q.correctAnswer, 1e-7) && Number.isInteger(Math.round(exp * 1e6) / 1e6) && oneOk && asc() && choices.every(c => /^.\s\d+cm²$/.test(c.htmlText) && c.value > 0) && choices.every(c => c.isCorrect === near(c.value, exp, 1e-7));
+    }
+    return false;
+}
+
 console.log(`単元数: ${R.UnitRegistry.list().length} / 各単元 ${N} 回生成\n`);
 for (const u of R.UnitRegistry.list()) {
     if (process.env.ONLY && !process.env.ONLY.split(',').includes(u.id)) continue;
@@ -1278,6 +1372,7 @@ for (const u of R.UnitRegistry.list()) {
         if (ch.length !== 5 || ch.filter(c => c.isCorrect).length !== 1) note('選択肢が5個/正解1つでない', q.title);
         seen.add(q.text + q.prompt);
         if (u.id === 'u10' && !checkU10(q, ch)) note('u10: 別解法と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
+        if (u.id === 'u26' && !checkU26(q, ch)) note('u26: 図の実測と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u25' && !checkU25(q, ch)) note('u25: 図の実測と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u24' && !checkU24(q, ch)) note('u24: 図の実測・列挙と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));
         if (u.id === 'u23' && !checkU23(q, ch)) note('u23: 独立計算と不一致', q.title + ' ' + q.text.replace(/\n/g, ' / '));

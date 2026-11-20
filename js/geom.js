@@ -4,7 +4,7 @@
  *
  * 図は q.figure = { type:'geom', items:[...] } で渡す。座標は数学の向き（y が上）で書けばよく、
  * geomSvg が全体を枠に収めて SVG にする（反転・拡大縮小も自動）。
- *   {k:'poly', pts:[[x,y],…], closed:true|false}      折れ線・多角形
+ *   {k:'poly', pts:[[x,y],…], closed:true|false, shade:true}   折れ線・多角形（shade:true で斜線を引く）
  *   {k:'seg',  a:[x,y], b:[x,y], dash:true, tick:n}   線分（tick:n で中央に等長の印を n 本）
  *   {k:'rt',   v:[x,y], a:[x,y], b:[x,y]}             v にある直角の記号（a・b は両辺の向き）
  *   {k:'lab',  p:[x,y], s:'A', from:[cx,cy] | dir:[dx,dy]}  点の名前（from の反対側、または dir の向きに少しずらして置く）
@@ -58,7 +58,7 @@ function geomSvg(fig) {
     items.forEach(it => {
         if (it.k === 'poly') {
             const P = it.pts.map(T).map(p => `${f(p[0])},${f(p[1])}`).join(' ');
-            out += it.closed ? `<polygon points="${P}" class="g-line g-fill"/>` : `<polyline points="${P}" class="g-line"/>`;
+            out += it.closed ? `<polygon points="${P}" class="g-line g-fill"${it.shade ? ' style="fill:url(#g-hatch)"' : ''}/>` : `<polyline points="${P}" class="g-line"/>`;
         } else if (it.k === 'seg') {
             const a = T(it.a), b = T(it.b);
             out += `<line x1="${f(a[0])}" y1="${f(a[1])}" x2="${f(b[0])}" y2="${f(b[1])}" class="g-line${it.dash ? ' g-dash' : ''}"/>`;
@@ -96,5 +96,6 @@ function geomSvg(fig) {
             }
         }
     });
-    return `<svg viewBox="0 0 ${W} ${H}" class="fig-geom" role="img" aria-label="問題の図">${out}</svg>`;
+    const defs = items.some(i => i.shade) ? '<defs><pattern id="g-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#fbbf24" stroke-width="1.5" opacity="0.85"/></pattern></defs>' : '';
+    return `<svg viewBox="0 0 ${W} ${H}" class="fig-geom" role="img" aria-label="問題の図">${defs}${out}</svg>`;
 }
