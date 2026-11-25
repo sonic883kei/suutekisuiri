@@ -4,7 +4,7 @@
  *
  * 図は q.figure = { type:'geom', items:[...] } で渡す。座標は数学の向き（y が上）で書けばよく、
  * geomSvg が全体を枠に収めて SVG にする（反転・拡大縮小も自動）。
- *   {k:'poly', pts:[[x,y],…], closed:true|false, shade:true}   折れ線・多角形（shade:true で斜線を引く）
+ *   {k:'poly', pts:[[x,y],…], closed:true|false, shade:true, holes:[[…],…]}   折れ線・多角形（shade:true で斜線を引く）
  *   {k:'seg',  a:[x,y], b:[x,y], dash:true, tick:n}   線分（tick:n で中央に等長の印を n 本）
  *   {k:'rt',   v:[x,y], a:[x,y], b:[x,y]}             v にある直角の記号（a・b は両辺の向き）
  *   {k:'lab',  p:[x,y], s:'A', from:[cx,cy] | dir:[dx,dy]}  点の名前（from の反対側、または dir の向きに少しずらして置く）
@@ -58,7 +58,11 @@ function geomSvg(fig) {
     items.forEach(it => {
         if (it.k === 'poly') {
             const P = it.pts.map(T).map(p => `${f(p[0])},${f(p[1])}`).join(' ');
-            out += it.closed ? `<polygon points="${P}" class="g-line g-fill"${it.shade ? ' style="fill:url(#g-hatch)"' : ''}/>` : `<polyline points="${P}" class="g-line"/>`;
+            const shd = it.shade ? ' style="fill:url(#g-hatch)"' : '';
+            if (it.closed && it.holes) {      // 穴のある図形（外側 − 内側）。偶奇規則で内側をぬく
+                const ring = r => 'M ' + r.map(T).map(p => `${f(p[0])} ${f(p[1])}`).join(' L ') + ' Z';
+                out += `<path d="${[it.pts, ...it.holes].map(ring).join(' ')}" fill-rule="evenodd" class="g-line g-fill"${shd}/>`;
+            } else out += it.closed ? `<polygon points="${P}" class="g-line g-fill"${shd}/>` : `<polyline points="${P}" class="g-line"/>`;
         } else if (it.k === 'seg') {
             const a = T(it.a), b = T(it.b);
             out += `<line x1="${f(a[0])}" y1="${f(a[1])}" x2="${f(b[0])}" y2="${f(b[1])}" class="g-line${it.dash ? ' g-dash' : ''}"/>`;

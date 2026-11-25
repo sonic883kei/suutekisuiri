@@ -75,7 +75,7 @@ function escapeHTML(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 function renderFractions(str) {   // {{n/d}} → 縦書き分数のHTML
-    return String(str).replace(/\{\{([\d√\s−+()×.]+)\/([\d√\s−+()×.]+)\}\}/g, '<span class="frac"><span class="frac-n">$1</span><span class="frac-d">$2</span></span>');
+    return String(str).replace(/\{\{([\dπ√\s−+()×.]+)\/([\dπ√\s−+()×.]+)\}\}/g, '<span class="frac"><span class="frac-n">$1</span><span class="frac-d">$2</span></span>');
 }
 function renderRich(str) { return renderFractions(escapeHTML(str)); }   // 問題文用（HTMLをエスケープしてから分数変換）
 
