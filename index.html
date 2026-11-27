@@ -80,7 +80,7 @@
         }
     </style>
 </head>
-<body data-build="20261127a" class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col justify-between">
+<body data-build="20261127b" class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col justify-between">
 
     <header class="bg-[#111827]/90 backdrop-blur-md text-white border-b border-slate-800/80 sticky top-0 z-40">
         <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
@@ -201,40 +201,24 @@
         </section>
 
         <!-- 3. CBT STATUS BAR -->
-        <section id="cbt-status-bar" class="hidden mb-5 bg-[#141a2e] text-white rounded-3xl p-5 shadow-2xl border border-slate-800 max-w-2xl mx-auto w-full animate-fade-in">
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                
-                <div class="relative w-24 h-24 flex items-center justify-center shrink-0">
-                    <svg class="w-full h-full" viewBox="0 0 120 120">
-                        <circle cx="60" cy="60" r="50" stroke="#1e293b" stroke-width="8" fill="transparent" />
-                        <circle id="cbt-circle-outer" class="progress-ring-circle" cx="60" cy="60" r="50" 
-                                stroke="#10b981" stroke-width="8" fill="transparent" 
-                                stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="0" />
-                        
-                        <circle cx="60" cy="60" r="36" stroke="#1e293b" stroke-width="8" fill="transparent" />
-                        <circle id="cbt-circle-inner" class="progress-ring-circle" cx="60" cy="60" r="36" 
-                                stroke="#6366f1" stroke-width="8" fill="transparent" 
-                                stroke-linecap="round" stroke-dasharray="226.19" stroke-dashoffset="226.19" />
-                    </svg>
+        <section id="cbt-status-bar" class="hidden mb-4 bg-[#141a2e] text-white rounded-2xl px-4 py-3 shadow-2xl border border-slate-800 max-w-2xl mx-auto w-full animate-fade-in">
+            <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center space-x-2 min-w-0">
+                    <span id="cbt-mode-badge" class="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-bold inline-flex items-center whitespace-nowrap">
+                        <i class="fa-solid fa-laptop-code mr-1.5"></i> CBT 模擬試験
+                    </span>
+                    <span class="text-xs text-slate-300 font-bold whitespace-nowrap" id="cbt-q-counter">1 / 10問</span>
                 </div>
-
-                <div class="flex-grow text-center sm:text-left">
-                    <div class="flex items-center justify-center sm:justify-start space-x-2 mb-1">
-                        <span id="cbt-mode-badge" class="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-bold inline-flex items-center">
-                            <i class="fa-solid fa-laptop-code mr-1.5"></i> CBT 模擬試験
-                        </span>
-                        <span class="text-xs text-slate-300 font-bold" id="cbt-q-counter">1 / 10問</span>
-                    </div>
-                    <p class="text-xs text-slate-400">全体残り時間: <span id="cbt-timer-text" class="text-amber-400 font-bold">12:00</span></p>
-                </div>
-
-                <div class="shrink-0 w-full sm:w-auto">
-                    <button onclick="exitCBTMode()" class="w-full sm:w-auto bg-slate-800/90 hover:bg-rose-950/50 hover:text-rose-300 text-slate-400 border border-slate-700/80 hover:border-rose-800/60 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5">
+                <div class="flex items-center space-x-3 shrink-0">
+                    <p class="text-xs text-slate-400 whitespace-nowrap">残り <span id="cbt-timer-text" class="text-amber-400 font-bold tabular-nums">12:00</span></p>
+                    <button onclick="exitCBTMode()" class="bg-slate-800/90 hover:bg-rose-950/50 hover:text-rose-300 text-slate-400 border border-slate-700/80 hover:border-rose-800/60 px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1">
                         <i class="fa-solid fa-rectangle-xmark"></i>
-                        <span>テスト中断</span>
+                        <span>中断</span>
                     </button>
                 </div>
-
+            </div>
+            <div class="mt-2.5 h-2 w-full rounded-full bg-slate-800 overflow-hidden" role="progressbar" aria-label="全体の残り時間">
+                <div id="cbt-time-bar" class="h-full rounded-full bg-emerald-500" style="width:100%; transition: width 1s linear, background-color 0.5s;"></div>
             </div>
         </section>
 
@@ -502,36 +486,36 @@
         }, true);
     </script>
     <!-- 読み込み順: core.js → 各単元 → ui.js （通常の<script>なので file:// でも動作） -->
-    <script src="js/core.js?v=20261127a"></script>
-    <script src="js/geom.js?v=20261127a"></script>
-    <script src="js/units/u01_concentration.js?v=20261127a"></script>
-    <script src="js/units/u02_age.js?v=20261127a"></script>
-    <script src="js/units/u03_profit.js?v=20261127a"></script>
-    <script src="js/units/u04_average.js?v=20261127a"></script>
-    <script src="js/units/u05_equation1.js?v=20261127a"></script>
-    <script src="js/units/u06_simultaneous.js?v=20261127a"></script>
-    <script src="js/units/u07_indefinite.js?v=20261127a"></script>
-    <script src="js/units/u08_traveler.js?v=20261127a"></script>
-    <script src="js/units/u09_train.js?v=20261127a"></script>
-    <script src="js/units/u10_river.js?v=20261127a"></script>
-    <script src="js/units/u11_clock.js?v=20261127a"></script>
-    <script src="js/units/u12_speed_other.js?v=20261127a"></script>
-    <script src="js/units/u13_inequality.js?v=20261127a"></script>
-    <script src="js/units/u14_work.js?v=20261127a"></script>
-    <script src="js/units/u15_newton.js?v=20261127a"></script>
-    <script src="js/units/u16_ratio.js?v=20261127a"></script>
-    <script src="js/units/u17_base.js?v=20261127a"></script>
-    <script src="js/units/u18_divisor_multiple.js?v=20261127a"></script>
-    <script src="js/units/u19_integer.js?v=20261127a"></script>
-    <script src="js/units/u20_magic_square.js?v=20261127a"></script>
-    <script src="js/units/u21_alphametic.js?v=20261127a"></script>
-    <script src="js/units/u22_sequence.js?v=20261127a"></script>
-    <script src="js/units/u23_quantity_other.js?v=20261127a"></script>
-    <script src="js/units/u24_triangle_polygon.js?v=20261127a"></script>
-    <script src="js/units/u24_triangle_polygon2.js?v=20261127a"></script>
-    <script src="js/units/u25_circle.js?v=20261127a"></script>
-    <script src="js/units/u26_area_triangle.js?v=20261127a"></script>
-    <script src="js/units/u27_area_circle.js?v=20261127a"></script>
-    <script src="js/ui.js?v=20261127a"></script>
+    <script src="js/core.js?v=20261127b"></script>
+    <script src="js/geom.js?v=20261127b"></script>
+    <script src="js/units/u01_concentration.js?v=20261127b"></script>
+    <script src="js/units/u02_age.js?v=20261127b"></script>
+    <script src="js/units/u03_profit.js?v=20261127b"></script>
+    <script src="js/units/u04_average.js?v=20261127b"></script>
+    <script src="js/units/u05_equation1.js?v=20261127b"></script>
+    <script src="js/units/u06_simultaneous.js?v=20261127b"></script>
+    <script src="js/units/u07_indefinite.js?v=20261127b"></script>
+    <script src="js/units/u08_traveler.js?v=20261127b"></script>
+    <script src="js/units/u09_train.js?v=20261127b"></script>
+    <script src="js/units/u10_river.js?v=20261127b"></script>
+    <script src="js/units/u11_clock.js?v=20261127b"></script>
+    <script src="js/units/u12_speed_other.js?v=20261127b"></script>
+    <script src="js/units/u13_inequality.js?v=20261127b"></script>
+    <script src="js/units/u14_work.js?v=20261127b"></script>
+    <script src="js/units/u15_newton.js?v=20261127b"></script>
+    <script src="js/units/u16_ratio.js?v=20261127b"></script>
+    <script src="js/units/u17_base.js?v=20261127b"></script>
+    <script src="js/units/u18_divisor_multiple.js?v=20261127b"></script>
+    <script src="js/units/u19_integer.js?v=20261127b"></script>
+    <script src="js/units/u20_magic_square.js?v=20261127b"></script>
+    <script src="js/units/u21_alphametic.js?v=20261127b"></script>
+    <script src="js/units/u22_sequence.js?v=20261127b"></script>
+    <script src="js/units/u23_quantity_other.js?v=20261127b"></script>
+    <script src="js/units/u24_triangle_polygon.js?v=20261127b"></script>
+    <script src="js/units/u24_triangle_polygon2.js?v=20261127b"></script>
+    <script src="js/units/u25_circle.js?v=20261127b"></script>
+    <script src="js/units/u26_area_triangle.js?v=20261127b"></script>
+    <script src="js/units/u27_area_circle.js?v=20261127b"></script>
+    <script src="js/ui.js?v=20261127b"></script>
 </body>
 </html>

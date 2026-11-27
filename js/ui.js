@@ -8,7 +8,7 @@
  */
 
 const ALL_UNITS = UnitRegistry.list();
-const APP_BUILD = '20261127a';   // index.html の data-build と同じ値にする（食い違うと画面に警告）
+const APP_BUILD = '20261127b';   // index.html の data-build と同じ値にする（食い違うと画面に警告）
 
         let configUnit = 'all';
 
@@ -327,6 +327,7 @@ const APP_BUILD = '20261127a';   // index.html の data-build と同じ値にす
             cbtTotalQuestions = 10;
             cbtMaxOverallTime = 720; // 12分制限時間
             cbtOverallRemainingTime = cbtMaxOverallTime;
+            updateCBTTimeBar();
 
             hideAllViews();
             document.getElementById('cbt-status-bar').classList.remove('hidden');
@@ -342,11 +343,7 @@ const APP_BUILD = '20261127a';   // index.html の data-build と同じ値にす
             cbtOverallTimerInterval = setInterval(() => {
                 cbtOverallRemainingTime--;
 
-                const outerCircle = document.getElementById('cbt-circle-outer');
-                if (outerCircle) {
-                    const frac = cbtOverallRemainingTime / cbtMaxOverallTime;
-                    outerCircle.style.strokeDashoffset = (314.16 * (1 - frac)).toString();
-                }
+                updateCBTTimeBar();
 
                 const min = Math.floor(cbtOverallRemainingTime / 60);
                 const sec = cbtOverallRemainingTime % 60;
@@ -364,11 +361,14 @@ const APP_BUILD = '20261127a';   // index.html の data-build と同じ値にす
 
         function updateCBTUI() {
             document.getElementById('cbt-q-counter').innerText = `${cbtQuestionIndex} / ${cbtTotalQuestions}問`;
-            const innerCircle = document.getElementById('cbt-circle-inner');
-            if (innerCircle) {
-                const frac = cbtQuestionIndex / cbtTotalQuestions;
-                innerCircle.style.strokeDashoffset = (226.19 * (1 - frac)).toString();
-            }
+        }
+
+        // 全体の残り時間バー：右から左へ縮む。残り3分で黄、1分で赤
+        function updateCBTTimeBar() {
+            const bar = document.getElementById('cbt-time-bar'); if (!bar) return;
+            const frac = Math.max(0, Math.min(1, cbtOverallRemainingTime / Math.max(1, cbtMaxOverallTime)));
+            bar.style.width = (frac * 100).toFixed(2) + '%';
+            bar.className = 'h-full rounded-full ' + (cbtOverallRemainingTime <= 60 ? 'bg-rose-500' : (cbtOverallRemainingTime <= 180 ? 'bg-amber-400' : 'bg-emerald-500'));
         }
 
         function exitCBTMode() {
