@@ -8,7 +8,7 @@
  */
 
 const ALL_UNITS = UnitRegistry.list();
-const APP_BUILD = '20261125a';   // index.html の data-build と同じ値にする（食い違うと画面に警告）
+const APP_BUILD = '20261127a';   // index.html の data-build と同じ値にする（食い違うと画面に警告）
 
         let configUnit = 'all';
 
@@ -412,13 +412,56 @@ const APP_BUILD = '20261125a';   // index.html の data-build と同じ値にす
             const copySec = Math.round(totalElapsedSec % 60);
             const text = `【高卒公務員試験 数的推理 CBT模擬試験結果】\n正解数: ${correctCount} / ${totalCount}\n正解率: ${accPct}%\n解答時間: ${copyMin}分${String(copySec).padStart(2, '0')}秒`;
 
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(text).then(() => {
-                    alert('結果をクリップボードにコピーしました！');
-                }).catch(() => alert(text));
-            } else {
-                alert(text);
+            copyTextRobust(text, '結果をコピーしました');
+        }
+
+        // コピーの共通処理。ホーム画面に追加したアプリ（iPhone）では clipboard API が使えないことがあるので、
+        // ①clipboard API → ②隠しテキスト欄 + execCommand → ③共有シート（「コピー」を選べる）の順に試す
+        function showToast(msg) {
+            let t = document.getElementById('app-toast');
+            if (!t) {
+                t = document.createElement('div'); t.id = 'app-toast';
+                t.className = 'fixed left-1/2 -translate-x-1/2 bottom-8 z-[100] bg-slate-900/95 text-white text-xs font-bold px-4 py-2.5 rounded-xl border border-slate-600 shadow-xl';
+                document.body.appendChild(t);
             }
+            t.textContent = msg; t.style.display = 'block';
+            clearTimeout(showToast._t); showToast._t = setTimeout(() => { t.style.display = 'none'; }, 2200);
+        }
+        function copyTextRobust(text, okMsg) {
+            const viaExec = () => {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = text; ta.setAttribute('readonly', '');
+                    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px;';      // 16px 未満だと iOS が拡大する
+                    document.body.appendChild(ta);
+                    ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+                    const ok = document.execCommand && document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    return !!ok;
+                } catch (e) { return false; }
+            };
+            const viaShare = () => {
+                if (navigator.share) { navigator.share({ text }).catch(() => {}); return true; }
+                return false;
+            };
+            const fallback = () => {
+                if (viaExec()) showToast(okMsg);
+                else if (!viaShare()) alert(text);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => showToast(okMsg)).catch(fallback);
+            } else fallback();
+        }
+
+        // 履歴（直近10回）をまとめてコピー
+        function copyHistory() {
+            try {
+                const stored = localStorage.getItem('komuin_cbt_history');
+                if (stored) globalHistory = JSON.parse(stored);
+            } catch (e) {}
+            if (!globalHistory.length) { showToast('コピーする履歴がありません'); return; }
+            const lines = globalHistory.map(h => `${h.date}　10問テスト　${h.score}（${h.accuracy}）　${h.totalTime}`);
+            copyTextRobust(`【高卒公務員試験 数的推理 CBT模擬試験 履歴（直近${globalHistory.length}回）】\n${lines.join('\n')}`, '履歴をコピーしました');
         }
 
 
