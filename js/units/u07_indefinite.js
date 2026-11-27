@@ -2,8 +2,8 @@
  * u07_indefinite.js  —  ⑦ 不定方程式
  * 3パターン（過去問の型）:
  *   Lv.1 値の求め方    … 3種類の硬貨で合計金額 M 円・合計 N 枚 → ある硬貨の枚数（2010 裁判所事務官Ⅲ種）
- *   Lv.2 3文字1式・A   … 3種類の定食の値段と合計金額、いずれも1食以上 → ある定食の人数（2016 裁判所一般職 高卒者区分）
- *   Lv.3 3文字2式・B   … 2つの倍数関係と「1以上100未満の整数」→ 3本の棒の長さの和（2016 海上保安学校 特別募集）
+ *   Lv.2 3文字1式   … 3種類の定食の値段と合計金額、いずれも1食以上 → ある定食の人数（2016 裁判所一般職 高卒者区分）
+ *   Lv.3 3文字2式   … 2つの倍数関係と「1以上100未満の整数」→ 3本の棒の長さの和（2016 海上保安学校 特別募集）
  * いずれも「解が1組に決まる」ことを総当たりで確かめた数値だけを出題する。
  * generate(level): level が 1〜3 ならそのパターン、それ以外は3パターンからランダム。
  */
@@ -50,7 +50,7 @@ function indefCoins() {
     };
 }
 
-// ---- Lv.2 3文字1式・A（3種類の定食）----
+// ---- Lv.2 3文字1式（3種類の定食）----
 function indefMeals() {
     let q = null;
     for (let i = 0; i < 50000 && !q; i++) {
@@ -77,7 +77,7 @@ function indefMeals() {
         lines.push(`${l[big]} ＝ ${v}: ${qs[oth[0]]}${l[oth[0]]} ＋ ${qs[oth[1]]}${l[oth[1]]} ＝ ${R} → ${found.length ? found.join('、') : '整数解なし'}`);
     }
     return {
-        unit: '⑦ 不定方程式', title: '3文字1式・A',
+        unit: '⑦ 不定方程式', title: '3文字1式',
         text: `ある食堂には、A定食、B定食、C定食の 3 種類の定食があり、それぞれの値段は、${p[0]} 円、${p[1]} 円、${p[2]} 円である。この食堂で、太郎と何人かの友達が 3 種類の定食のいずれかを一人 1 食注文したところ、合計金額が ${M.toLocaleString()} 円であった。3 種類の定食は、いずれも最低 1 食は注文された。`,
         prompt: `このとき、${L[ti]}定食を注文した人は何人か。`,
         correctAnswer: c[ti], unitSuffix: '人', step: 1, consecutive: true,
@@ -90,7 +90,7 @@ function indefMeals() {
     };
 }
 
-// ---- Lv.3 3文字2式・B（棒の長さ：倍数関係と「1以上100未満の整数」）----
+// ---- Lv.3 3文字2式（棒の長さ：倍数関係と「1以上100未満の整数」）----
 function indefSticks() {
     let q = null;
     for (let i = 0; i < 100000 && !q; i++) {
@@ -104,7 +104,7 @@ function indefSticks() {
     const { r, s, t, a, b, c, d } = q, names = shuffleArray(['赤色', '青色', '黄色', '緑色', '白色']).slice(0, 3), L = lcmOf(a, c);
     function lcmOf(x, y) { return (x / Fr.gcd(x, y)) * y; }
     return {
-        unit: '⑦ 不定方程式', title: '3文字2式・B',
+        unit: '⑦ 不定方程式', title: '3文字2式',
         text: `${names[0]}、${names[1]}、${names[2]}の棒が 1 本ずつ合計 3 本ある。これらの棒の長さについて次のことが分かっている。\n○ ${names[0]}の棒の長さの ${a} 倍は、${names[1]}の棒の長さの ${b} 倍と等しい。\n○ ${names[1]}の棒の長さの${Fr.str(Fr.make(1, c))}倍は、${names[2]}の棒の長さの${Fr.str(Fr.make(1, d))}倍と等しい。\n○ 3 本の棒の長さは、いずれも 1 以上 100 未満の整数値である。`,
         prompt: 'このとき、3 本の棒の長さの和はいくらか。',
         correctAnswer: r + s + t, unitSuffix: '', step: 5, consecutive: true,
